@@ -239,3 +239,5 @@ Data lives in `data/wiz.db` (one event = one file) with CSV copies in
   accuracy and the most common wrong answers, to help write the next quiz.
 - [ ] **Real-network rehearsal checklist** (phones, router, channel, client
   limit) kept next to the load test, with the numbers from each rehearsal.
+- [ ] **Top scorers**
+- [ ] **Allow teams to name themselves**
