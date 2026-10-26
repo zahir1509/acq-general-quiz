@@ -67,6 +67,7 @@ class Engine(object):
         self.last_seen = {}                # team_id -> epoch of last contact
         self.ver = {"q": 0, "t": 0, "a": 0, "g": 0, "s": 0, "c": 0}
         self._sb_cache = (None, None)
+        self._ups_cache = (None, None)
         self._blob_cache = {}
         self.reload()
 
@@ -391,6 +392,8 @@ class Engine(object):
                 u["locked_at"] = now
             if not self.get_num("reveal_q", 0):
                 u["reveal_q"] = nums[0]
+            if cur != "REVEAL":
+                u["reveal_shown"] = 0
             u["deadline"] = ""
         self.set_cfg(u)
         self.db.audit("scorer", "phase", {"from": cur, "to": phase})
@@ -455,7 +458,51 @@ class Engine(object):
         cur = int(self.get_num("reveal_q", 0))
         idx = nums.index(cur) if cur in nums else 0
         idx = max(0, min(len(nums) - 1, idx + delta))
-        self.set_cfg({"reveal_q": nums[idx], "reveal_page": idx // 6})
+        self.set_cfg({"reveal_q": nums[idx], "reveal_page": idx // 6, "reveal_shown": 0})
+
+    def reveal_limits(self):
+        """(highest question whose text is up, highest question whose answer is public)."""
+        nums = self._numbers()
+        if not nums:
+            return 0, 0
+        shown = self.get_bool("reveal_shown", False)
+        if self.get("reveal_view") == "list":
+            start = int(self.get_num("reveal_page", 0)) * 6
+            start = max(0, min(start, len(nums) - 1))
+            end = min(len(nums), start + 6) - 1
+            return nums[end], (nums[end] if shown else (nums[start - 1] if start else 0))
+        cur = int(self.get_num("reveal_q", 0))
+        idx = nums.index(cur) if cur in nums else 0
+        return nums[idx], (nums[idx] if shown else (nums[idx - 1] if idx else 0))
+
+    def scores_upto(self, limit):
+        """Standings counting only questions up to `limit`; what phones see mid-reveal."""
+        key = (self.ver["s"], limit)
+        with self.lock:
+            if self._ups_cache[0] == key:
+                return self._ups_cache[1]
+        dp = self.get_num("default_points", 10.0)
+        rows = self.db.q(
+            "SELECT t.id, t.number,"
+            " COALESCE((SELECT SUM(g.fraction * COALESCE(q.points, ?))"
+            "   FROM answers a JOIN questions q ON q.id = a.question_id"
+            "   JOIN grades g ON g.question_id = a.question_id AND g.norm = a.norm"
+            "   WHERE a.team_id = t.id AND a.norm <> '' AND q.number <= ?), 0) AS s,"
+            " COALESCE((SELECT SUM(points) FROM adjustments WHERE team_id = t.id), 0) AS adj"
+            " FROM teams t WHERE t.active = 1", (dp, limit))
+        nums = self._numbers()
+        finished = bool(nums) and limit >= nums[-1]
+        for r in rows:
+            r["score"] = round(r["s"] + (r["adj"] if finished else 0), 2)
+        rows.sort(key=lambda r: (-r["score"], r["number"]))
+        rank, prev = 0, None
+        for i, r in enumerate(rows):
+            if r["score"] != prev:
+                rank, prev = i + 1, r["score"]
+            r["rank"] = rank
+        with self.lock:
+            self._ups_cache = (key, rows)
+        return rows
 
     def accepting(self, qnum, ts):
         """May an answer for question `qnum`, typed at server-time `ts`, be stored now?"""
@@ -582,10 +629,10 @@ class Engine(object):
             self._blob_cache = {key: (etag, body)}
         return etag, body
 
-    def reveal_items(self, team=None, upto=None):
-        """Answers revealed so far, with the team's own answer (and marks if published)."""
+    def reveal_items(self, team=None):
+        """Questions up on the reveal; answers and marks only for those already shown."""
         publish = self.get_bool("results_to_phones", False)
-        limit = int(self.get_num("reveal_q", 0)) if upto is None else upto
+        limit, shown_upto = self.reveal_limits()
         mine = {}
         grades = {}
         if team:
@@ -598,12 +645,14 @@ class Engine(object):
         for q in self._questions:
             if q["number"] > limit:
                 break
-            it = {"n": q["number"], "text": q["text"], "answer": q["official_answer"],
-                  "images": q["answer_images"] if self.get_bool("send_media_to_phones") else []}
+            it = {"n": q["number"], "text": q["text"]}
+            if q["number"] <= shown_upto:
+                it["answer"] = q["official_answer"]
+                it["images"] = q["answer_images"] if self.get_bool("send_media_to_phones") else []
             if team:
                 a = mine.get(q["id"])
                 it["mine"] = a["answer"] if a else ""
-                if publish:
+                if publish and q["number"] <= shown_upto:
                     fr = grades.get((q["id"], a["norm"]), 0.0) if a and a["norm"] else 0.0
                     it["points"] = round(fr * self.points_for(q), 2)
             items.append(it)
@@ -830,7 +879,7 @@ class Engine(object):
                 self._sync_auto(c, q)
         self.db.write(job)
         self.set_cfg({"phase": "LOBBY", "current_q": 0, "max_revealed": 0, "deadline": "",
-                      "locked_at": "", "hint_cutoff": "", "reveal_q": 0, "reveal_page": 0})
+                      "locked_at": "", "hint_cutoff": "", "reveal_q": 0, "reveal_page": 0, "reveal_shown": 0})
         self.bump("a", "g")
         self.db.audit("scorer", "quiz.clear", {})
 
@@ -847,7 +896,7 @@ class Engine(object):
                     self._sync_auto(c, q)
         self.db.write(job)
         self.set_cfg({"phase": "LOBBY", "current_q": 0, "max_revealed": 0, "deadline": "",
-                      "locked_at": "", "hint_cutoff": "", "reveal_q": 0, "reveal_page": 0})
+                      "locked_at": "", "hint_cutoff": "", "reveal_q": 0, "reveal_page": 0, "reveal_shown": 0})
         self.reload()
         self.bump("a", "g")
         self.db.audit("scorer", "quiz.master_reset", dict(stats, dropped_questions=drop_questions))

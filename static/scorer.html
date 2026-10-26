@@ -44,7 +44,9 @@
   .bigtimer { font-family: var(--mono); font-size: 54px; font-weight: 850; font-variant-numeric: tabular-nums; }
   .bigtimer.low { color: var(--red); }
   .thumbs img { max-height: 70px; border-radius: 6px; margin-right: 6px; }
-  .mediabar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+  .qboard { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; }
+  .qb { padding: 10px 0; font-weight: 800; font-family: var(--mono); }
+  .qb.on { background: var(--accent); border-color: var(--accent); color: #08111f; }  .mediabar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
 
   /* ------------------------------------------------------------- tiles */
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 5px; }

@@ -136,6 +136,7 @@ DEFAULT_CONFIG = {
     "reveal_q": "0",
     "reveal_view": "single",   # single | list
     "reveal_page": "0",
+    "reveal_shown": "0",      # 1 once the quizmaster presses SHOW ANSWER for the current reveal step
 }
 
 

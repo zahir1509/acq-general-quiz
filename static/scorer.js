@@ -113,6 +113,10 @@
     return (c && c.images || []).filter(function (u) { return W.mediaType(u) !== 'image'; }).length;
   }
 
+  function hasVideo(c) {
+    return (c && c.images || []).some(function (u) { return W.mediaType(u) === 'video'; });
+  }
+
   function mediaBar(c) {
     if (!avOf(c)) return '';
     return '<div class="mediabar"><span class="small muted">PROJECTOR MEDIA:</span>' +
@@ -124,7 +128,9 @@
       '<button class="btn-sm" data-a="media" data-v="volume" data-n="0.3">VOL LOW</button>' +
       '<button class="btn-sm" data-a="media" data-v="volume" data-n="1">VOL FULL</button>' +
       '<button class="btn-sm" data-a="media" data-v="mute">MUTE</button>' +
-      '<button class="btn-sm" data-a="media" data-v="unmute">UNMUTE</button></div>';
+      '<button class="btn-sm" data-a="media" data-v="unmute">UNMUTE</button>' +
+      (hasVideo(c) ? '<button class="btn-sm btn-primary" data-a="media" data-v="fullscreen">&#9974; FULLSCREEN</button>' +
+        '<button class="btn-sm" data-a="media" data-v="exitfullscreen">EXIT FULLSCREEN</button>' : '') + '</div>';
   }
 
   function questionCard(f) {
@@ -160,10 +166,14 @@
     }
     if (f.phase === 'PASS1' || f.phase === 'PASS2') {
       var last = f.pos >= f.total;
-      var nextBtn = last
-        ? '<button data-a="phase" data-v="' + (f.phase === 'PASS1' ? 'PASS2' : 'PASS3') + '" class="btn-primary btn-xl">END PASS ' +
-          f.phase.slice(4) + ' &rarr; ' + (f.phase === 'PASS1' ? 'PASS 2' : 'PASS 3') + '</button>'
-        : '<button data-a="step" data-v="1" class="btn-primary btn-xl">NEXT &#9654;</button>';
+      var nextBtn = '<button data-a="step" data-v="1" class="btn-primary btn-xl"' + (last ? ' disabled' : '') + '>NEXT &#9654;</button>';
+      var endBtn = '<button data-a="phase" data-v="' + (f.phase === 'PASS1' ? 'PASS2' : 'PASS3') + '" class="' +
+        (last ? 'btn-green ' : '') + 'btn-xl">END PASS ' + f.phase.slice(4) + ' &rarr; ' +
+        (f.phase === 'PASS1' ? 'PASS 2' : 'PASS 3') + '</button>';
+      var board = (D.questions || []).map(function (q) {
+        var on = f.current && q.number === f.current.n;
+        return '<button class="qb' + (on ? ' on' : '') + '" data-a="goto" data-v="' + q.number + '">' + q.number + '</button>';
+      }).join('');
       var opts = (D.questions || []).map(function (q) {
         return '<option value="' + q.number + '"' + (f.current && q.number === f.current.n ? ' selected' : '') + '>Q' + q.number + '</option>';
       }).join('');
@@ -173,6 +183,8 @@
         questionCard(f) + mediaBar(f.current) +
         '<div class="controls"><button data-a="step" data-v="-1" class="btn-xl"' + (f.pos <= 1 ? ' disabled' : '') + '>&#9664; PREV</button>' +
         nextBtn + '<select id="jump" style="flex:0 0 110px">' + opts + '</select></div>' +
+        '<div class="qboard mb">' + board + '</div>' +
+        '<div class="controls">' + endBtn + '</div>' +
         timerBlock(f, 'TIMER', num(cfg.q_timer_seconds) || 30) +
         '<div class="small muted"><b id="runAnswered">' + c.answered + '</b> of ' + c.joined + ' joined teams have answered this question. ' +
         'The timer is a visual aid in passes 1 and 2; nothing is cut off.</div>';
@@ -201,9 +213,15 @@
       (f.unreviewed.answers ? '<div class="warnbox">' + f.unreviewed.answers + ' answers are still unreviewed and count as 0.</div>' : '') +
       (rq ? '<div class="qtext">Q' + rq.number + '. ' + esc(rq.text) + '</div><div class="qans">Answer: <b>' + esc(rq.official_answer) + '</b></div>' : '') +
       '<div class="controls"><button data-a="reveal" data-v="prev" class="btn-xl">&#9664; PREV</button>' +
+      '<button data-a="reveal" data-v="' + (f.reveal_shown ? 'hide' : 'show') + '" class="btn-xl ' + (f.reveal_shown ? '' : 'btn-green') + '">' +
+      (f.reveal_shown ? 'HIDE ANSWER' : 'SHOW ANSWER') + '</button>' +
       '<button data-a="reveal" data-v="next" class="btn-primary btn-xl">NEXT &#9654;</button>' +
       '<button data-a="reveal" data-v="view:' + (f.reveal_view === 'list' ? 'single' : 'list') + '" class="btn-xl">' +
       (f.reveal_view === 'list' ? 'ONE AT A TIME' : 'LIST VIEW (6 per page)') + '</button></div>' +
+      '<div class="qboard mb">' + (D.questions || []).map(function (q) {
+        return '<button class="qb' + (q.number === qn ? ' on' : '') + '" data-a="revealgoto" data-v="' + q.number + '">' + q.number + '</button>';
+      }).join('') + '</div>' +
+      '<div class="small muted mb">Teams see the question first; the answer, marks and running score appear on phones only after SHOW ANSWER.</div>' +
       '<div class="small muted">Open the <a href="/board" target="_blank">scoreboard</a> on the projector when you are done.</div>';
   }
 
@@ -215,7 +233,7 @@
     el('noContentMsg').textContent = missing;
     stepper(f);
     if (f.phase !== lastPhase) { lastPhase = f.phase; timerSecs = null; }
-    var key = [f.phase, f.pos, f.reveal_q, f.reveal_view, f.deadline ? 1 : 0, f.total, f.current && f.current.n,
+    var key = [f.phase, f.pos, f.reveal_q, f.reveal_view, f.reveal_shown, f.deadline ? 1 : 0, f.total, f.current && f.current.n,
                f.unreviewed.answers > 0 ? 1 : 0, (D.questions || []).length, (D.config || {}).q_timer_seconds].join('|');
     if (key !== runKey && !(document.activeElement && document.activeElement.id === 'tSecs')) {
       runKey = key;
@@ -267,6 +285,8 @@
     var a = b.getAttribute('data-a'), v = b.getAttribute('data-v'), n = b.getAttribute('data-n');
     if (a === 'phase') setPhase(v);
     else if (a === 'step') act('/api/admin/step', { delta: Number(v) });
+    else if (a === 'goto') act('/api/admin/step', { goto: Number(v) });
+    else if (a === 'revealgoto') act('/api/admin/reveal', { action: 'goto', q: Number(v) });
     else if (a === 'timer') {
       var secs = el('tSecs') ? num(el('tSecs').value) : null;
       if (v === 'start') act('/api/admin/timer', { action: 'start', seconds: secs });
@@ -274,6 +294,7 @@
     } else if (a === 'media') act('/api/admin/media', { action: v, value: n == null ? 0 : Number(n) });
     else if (a === 'reveal') {
       if (v.indexOf('view:') === 0) act('/api/admin/reveal', { action: 'view', view: v.slice(5) });
+      else if (v === 'show' || v === 'hide') act('/api/admin/reveal', { action: 'show', on: v === 'show' });
       else act('/api/admin/reveal', { action: v });
     } else if (a === 'reopen') {
       act('/api/admin/phase', { phase: 'PASS3' }).then(function () {

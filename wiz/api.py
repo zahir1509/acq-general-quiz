@@ -99,28 +99,36 @@ def team_frame(app):
         "deadline": eng.deadline(), "now": time.time(),
         "cv": eng.question_blob()[0],
         "reveal_q": int(eng.get_num("reveal_q", 0)),
-        "results": eng.get_bool("results_to_phones", False),
+        "reveal_k": _reveal_key(eng),
         "show_text": eng.get_bool("show_question_on_phone", True),
     }
 
 
+def _reveal_key(eng):
+    return "%s|%s|%s|%s" % (eng.get("reveal_q"), eng.get("reveal_shown"),
+                            eng.get("reveal_view"), eng.get("reveal_page"))
+
+
 def _reveal_block(eng):
     nums = eng._numbers()
+    shown = eng.get_bool("reveal_shown", False)
     if eng.get("reveal_view") == "list":
         per, page = 6, int(eng.get_num("reveal_page", 0))
         pages = max(1, -(-len(nums) // per))
         page = max(0, min(pages - 1, page))
         qs = eng.questions()[page * per:(page + 1) * per]
-        return {"view": "list", "page": page, "pages": pages,
-                "items": [{"n": q["number"], "text": q["text"], "answer": q["official_answer"]}
+        return {"view": "list", "page": page, "pages": pages, "shown": shown,
+                "items": [dict({"n": q["number"], "text": q["text"]},
+                               **({"answer": q["official_answer"]} if shown else {}))
                           for q in qs]}
     q = eng.question_by_number(eng.get_num("reveal_q", 0))
     if not q:
         return {"view": "single", "item": None}
-    return {"view": "single", "pos": nums.index(q["number"]) + 1,
-            "item": {"n": q["number"], "text": q["text"], "images": q["images"],
-                     "answer": q["official_answer"], "alts": q["alt_answers"],
-                     "answer_images": q["answer_images"]}}
+    item = {"n": q["number"], "text": q["text"], "images": q["images"]}
+    if shown:
+        item.update(answer=q["official_answer"], alts=q["alt_answers"],
+                    answer_images=q["answer_images"])
+    return {"view": "single", "pos": nums.index(q["number"]) + 1, "shown": shown, "item": item}
 
 
 def screen_frame(app):
@@ -174,6 +182,7 @@ def scorer_frame(app):
                      "alt_answers": cur["alt_answers"], "notes": cur["notes"]} if cur else None),
         "deadline": eng.deadline(), "now": time.time(),
         "reveal_q": int(eng.get_num("reveal_q", 0)), "reveal_view": eng.get("reveal_view"),
+        "reveal_shown": eng.get_bool("reveal_shown", False),
         "reveal_page": int(eng.get_num("reveal_page", 0)),
         "counts": {"teams": len(teams), "joined": sum(1 for t in teams if t["joined_at"]),
                    "online": sum(1 for t in teams if t["id"] in online),
@@ -304,9 +313,11 @@ def r_team_reveal(ctx):
     if eng.phase() == "REVEAL":
         out["items"] = eng.reveal_items(t)
         if eng.get_bool("results_to_phones", False):
-            for r in eng.scoreboard():
+            _, shown_upto = eng.reveal_limits()
+            rows = eng.scores_upto(shown_upto)
+            for r in rows:
                 if r["number"] == t["number"]:
-                    out.update(total=r["score"], rank=r["rank"], of=len(eng.scoreboard()))
+                    out.update(total=r["score"], rank=r["rank"], of=len(rows))
     return out
 
 
@@ -637,17 +648,19 @@ def r_reveal(ctx):
             nums = eng._numbers()
             pages = max(1, -(-len(nums) // 6))
             page = max(0, min(pages - 1, int(eng.get_num("reveal_page", 0)) + delta))
-            eng.set_cfg({"reveal_page": page})
+            eng.set_cfg({"reveal_page": page, "reveal_shown": 0})
         else:
             eng.reveal_step(delta)
+    elif action == "show":
+        eng.set_cfg({"reveal_shown": 1 if ctx.flag("on", True) else 0})
     elif action == "view":
         view = "list" if ctx.arg("view") == "list" else "single"
-        eng.set_cfg({"reveal_view": view})
+        eng.set_cfg({"reveal_view": view, "reveal_shown": 0})
     elif action == "goto":
         q = eng.question_by_number(ctx.arg("q"))
         if not q:
             raise QuizError("No such question", 404)
-        eng.set_cfg({"reveal_q": q["number"]})
+        eng.set_cfg({"reveal_q": q["number"], "reveal_shown": 0})
     else:
         raise QuizError("unknown reveal action", 400)
     ctx.app.publish_all()
@@ -655,10 +668,11 @@ def r_reveal(ctx):
 
 
 def r_media(ctx):
-    """Projector playback control: play | pause | restart | seek | volume | mute."""
+    """Projector playback control: play | pause | restart | seek | volume | mute | fullscreen."""
     ctx.require_admin()
     action = ctx.arg("action")
-    if action not in ("play", "pause", "restart", "seek", "volume", "mute", "unmute"):
+    if action not in ("play", "pause", "restart", "seek", "volume", "mute", "unmute",
+                      "fullscreen", "exitfullscreen"):
         raise QuizError("unknown media action", 400)
     m = ctx.app.media_cmd
     ctx.app.media_cmd = {"n": m["n"] + 1, "action": action,

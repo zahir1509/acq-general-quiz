@@ -268,6 +268,28 @@ class FlowTests(unittest.TestCase):
         self.assertEqual(s, 400)
         self.assertEqual(len(self.eng.teams()), 3)
 
+    def test_reveal_hides_answer_and_score_until_shown(self):
+        tok = self.env.join(1)
+        self.env.call("POST", "/api/admin/config", {"results_to_phones": "1"}, self.adm)
+        self.phase("PASS2")
+        self.save(tok, item(1, "paris", 1), item(2, "1947", 1))
+        self.phase("REVEAL")
+
+        def view():
+            return self.env.call("GET", "/api/team/reveal", token=tok)[1]
+        r = view()
+        self.assertNotIn("answer", r["items"][0])
+        self.assertEqual(r["total"], 0)
+        self.env.call("POST", "/api/admin/reveal", {"action": "show"}, self.adm)
+        r = view()
+        self.assertEqual((r["items"][0]["answer"], r["items"][0]["points"], r["total"]), ("Paris", 10, 10))
+        self.env.call("POST", "/api/admin/reveal", {"action": "next"}, self.adm)
+        r = view()
+        self.assertNotIn("answer", r["items"][1])
+        self.assertEqual(r["total"], 10)                    # Q2 is not counted until its answer is shown
+        frame = json.loads(self.env.call("GET", "/api/pub?role=screen", raw=True)[1])["frame"]
+        self.assertNotIn("answer", frame["reveal"]["item"])
+
     def test_phase_requires_content(self):
         self.eng.delete_question(self.eng.question_by_number(1)["id"])
         self.eng.delete_question(self.eng.question_by_number(2)["id"])

@@ -18,7 +18,7 @@ LOBBY -> PASS 1 -> PASS 2 -> PASS 3 -> LOCKED -> REVEAL
 | **Pass 2** | the same walk-through again, from question 1 | everything pre-filled: your earlier answer and your Notes. Edit either |
 | **Pass 3** | "PASS 3" + instructions + a big countdown (default 2:00). No questions shown | a grid of all questions: tap any one, change the answer. Notes are shown read-only |
 | **Locked** | "Answers locked" | "Answers locked" |
-| **Reveal** | every question with its answer, one at a time or six per page | the answers revealed so far, your own answer, and optionally your marks |
+| **Reveal** | each question first, then its answer when you press **Show answer** (one at a time or six per page) | the questions so far; each answer, your own answer and your marks appear only once shown, and your running score counts only the answers shown so far |
 
 * The **latest answer a team saved is its final answer.**
 * There is no pounce, bounce or negative marking. Scoring is flat points per
@@ -174,3 +174,68 @@ tests/               unit/integration tests and the load test
 
 Data lives in `data/wiz.db` (one event = one file) with CSV copies in
 `data/backups/`; a clear or reset archives a timestamped copy first.
+
+## TODO
+
+**Requested**
+
+- [ ] **Scorer authentication.** Today the default PIN is in the
+  source (`wiz/db.py`), the PIN is stored in plain text in `data/wiz.db`, and
+  one shared PIN gives full control, so anyone who has read the repo can sign
+  in to a scorer page on the quiz Wi-Fi. Ideas, roughly in order of value:
+  - No default PIN: generate a random PIN on first run, print it in the
+    terminal, and store only a salted hash.
+  - Per-person scorer access instead of one shared PIN: the laptop operator
+    approves each new scorer device from a "pending devices" list, can see who
+    is signed in, and can revoke one device without changing anything for the
+    rest.
+  - Serve the admin API and the destructive actions (clear, master reset,
+    change PIN) to `localhost` only unless a device has been approved.
+  - Bind the token to the device and give it an expiry, rather than deriving
+    it from the PIN.
+- [ ] **Team off-screen alert and tracker.** Tell the scorer when a team's
+  phone leaves the quiz page (tab switch, app switch, screen lock) and keep a
+  per-team record of it.
+  - The phone reports page visibility and sends a light heartbeat only while
+    the page is in front (every ~15 s, not every 2 s, to protect the Wi-Fi).
+    The server decides "away" from silence, since a closing tab cannot be
+    trusted to say goodbye.
+  - Scorer: a banner for teams currently away, and a per-team count and total
+    time away, split by phase (passes 1-3 matter, the lobby does not).
+  - Evidence, not proof: a Wi-Fi drop looks the same as a tab switch, so
+    show it as a signal and let the quizmaster decide.
+  - Keep it optional (a SETUP toggle), as it is the main extra load on the
+    network.
+
+**Suggested improvements**
+
+- [ ] **Rehearsal / dry-run mode** that fills the quiz with simulated teams
+  and answers, so the quizmaster can practise the flow and the review screen
+  without touching a real event. Reuse `tests/loadtest.py`.
+- [ ] **Undo for marking.** Marking decisions are reversible one by one
+  (clear), but there is no "undo my last 10 clicks". An undo stack for
+  grading would make fast keyboard review safer.
+- [ ] **Tie-breaks:** a tie-break question, or rank ties by earliest correct
+  answers (the answer history already has the timestamps).
+- [ ] **Resume a team without a PIN** when a phone dies, by letting the
+  scorer hand over the session from the TEAMS tab with a one-time code. Today
+  RESET issues a new PIN, which the team must retype.
+- [ ] **Smarter review suggestions:** suggest accepting a recurring
+  misspelling for *all* questions of the same type, and flag answers that
+  contain the official answer inside a longer sentence.
+- [ ] **Answer-slide polish:** show each answer's explanation or source line
+  (a new CSV column) on the projector after the answer is shown.
+- [ ] **Offline-first phone page** (a service worker that caches the page
+  shell), so reopening the page after a lost connection or a browser restart
+  does not need the server to load.
+- [ ] **Live network health view** in the scorer: phones with failed or
+  retrying saves, slowest teams, and a warning when many phones reconnect at
+  once. Phones already know their own save state and could report it.
+- [ ] **Accessibility:** larger text option on phones, high-contrast
+  projector theme, and a keyboard-only path through the scorer.
+- [ ] **Automated browser tests** for the phone, projector and scorer pages
+  (currently only the server side is covered by tests).
+- [ ] **Post-event report:** a printable results page with per-question
+  accuracy and the most common wrong answers, to help write the next quiz.
+- [ ] **Real-network rehearsal checklist** (phones, router, channel, client
+  limit) kept next to the load test, with the numbers from each rehearsal.

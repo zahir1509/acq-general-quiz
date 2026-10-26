@@ -302,7 +302,7 @@
     if (!frame) return;
     var f = frame, st = el('stage');
     var key = [f.phase, f.q ? f.q.n : '', openQ, f.deadline ? 1 : 0, f.show_text, f.cv,
-               f.phase === 'REVEAL' ? f.reveal_q : '', qList().length].join('|');
+               f.phase === 'REVEAL' ? f.reveal_k : '', qList().length].join('|');
     if (key === lastKey && !force) { tickTimer(); return; }
     // never rebuild the page under a finger that is typing
     var viewId = [f.phase, f.q ? f.q.n : '', openQ].join('|');
@@ -377,10 +377,11 @@
   // ---------------------------------------------------------------- reveal
   function loadReveal() {
     var f = frame;
-    if (revealFor === f.reveal_q && revealItems) return paintReveal();
+    if (revealItems) paintReveal();           // keep the last view up while the new step loads
+    if (revealFor === f.reveal_k && revealItems) return;
     setTimeout(function () {
       W.get('/api/team/reveal', token).then(function (r) {
-        revealItems = r.items || []; revealFor = f.reveal_q; revealMeta = r; paintReveal();
+        revealItems = r.items || []; revealFor = f.reveal_k; revealMeta = r; paintReveal();
       }).catch(function (e) { if (e.status === 401) logout(); });
     }, Math.random() * 1200);
   }
@@ -398,7 +399,7 @@
         (it.points !== undefined ? '<span class="pts ' + (it.points > 0 ? 'pos' : 'muted') + '">' +
           W.fmtPoints(it.points) + '</span>' : '') + '</div>' +
         (it.text ? '<div>' + esc(it.text) + '</div>' : '') +
-        '<div class="a">' + esc(it.answer) + '</div>' +
+        '<div class="a">' + (it.answer !== undefined ? esc(it.answer) : '<span class="muted">Answer coming up…</span>') + '</div>' +
         '<div class="m">You wrote: ' + (it.mine ? esc(it.mine) : '—') + '</div></div>';
     });
     b.innerHTML = h || '<div class="big"><p>Answers will appear here as they are revealed.</p></div>';

@@ -38,6 +38,9 @@
   .media { max-width: 100%; max-height: 46vh; border-radius: 12px; object-fit: contain; }
   .media-video { width: min(78vw, 1000px); max-height: 42vh; background: #000; }
   .media-audio { width: min(78vw, 900px); }
+  /* fills the projector without needing a click on it, unlike the browser's own fullscreen */
+  .media-video.theater { position: fixed; inset: 0; width: 100vw; height: 100vh; max-width: none;
+    max-height: none; z-index: 40; border-radius: 0; background: #000; object-fit: contain; }
 
   .center-block { text-align: center; }
   .center-block h1 { font-size: 9rem; letter-spacing: -0.03em; line-height: 1; }
@@ -105,11 +108,21 @@
   }
   function players() { return document.querySelectorAll('#gallery audio, #gallery video'); }
 
+  function setTheater(on) {
+    var v = document.querySelector('#gallery video');
+    if (!v) return;
+    v.classList.toggle('theater', on);
+    if (!on && document.fullscreenElement) document.exitFullscreen().catch(function () {});
+    // the real fullscreen call only works if the browser still counts the earlier click
+    if (on && v.requestFullscreen) v.requestFullscreen().catch(function () {});
+  }
+
   function applyMedia(m) {
     if (!m) return;
     if (lastMediaN === null) { lastMediaN = m.n; return; }
     if (m.n === lastMediaN) return;
     lastMediaN = m.n;
+    if (m.action === 'fullscreen' || m.action === 'exitfullscreen') return setTheater(m.action === 'fullscreen');
     var list = players(), p = list[m.idx || 0] || list[0];
     if (!p) return;
     var v = Number(m.value) || 0;
@@ -196,12 +209,16 @@
     if (r.view === 'list') {
       return '<div class="rgrid">' + r.items.map(function (it) {
         return '<div class="rcard"><div class="n">Q' + it.n + '</div><div class="t">' + esc(it.text) +
-          '</div><div class="a">' + esc(it.answer) + '</div></div>';
+          '</div><div class="a">' + (it.answer !== undefined ? esc(it.answer) : '?') + '</div></div>';
       }).join('') + '</div><div class="muted center" style="margin-top:2vh;font-size:1.4rem">Page ' +
         (r.page + 1) + ' of ' + r.pages + '</div>';
     }
     var it = r.item;
     if (!it) return '<div class="center-block"><h2>Ready to reveal</h2></div>';
+    if (it.answer === undefined) {
+      return '<div class="' + ((it.images || []).length ? 'has-media' : '') + '"><div class="qtext' + sizeClass(it.text) +
+        '">Q' + it.n + '. ' + esc(it.text) + '</div><div id="gallery" class="gallery">' + galleryHtml(it.images || []) + '</div></div>';
+    }
     var alts = (it.alts || []).length ? 'Also accepted: ' + it.alts.map(esc).join(' · ') : '';
     var imgs = (it.answer_images || []).map(function (u) {
       return P.mediaType(u) === 'image' ? '<img class="media" src="' + esc(u) + '" alt="">' : '';
