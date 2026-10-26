@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Join the Quiz</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+  /* Projector landing page, designed on a 1920x1080 canvas.
+
+     1rem is 1% of the screen width, or 1.78% of its height if the screen is
+     less wide than 16:9, so the layout is one fixed 100 x 56.25 rem composition
+     scaled to fit. At 1080p 1rem = 19.2px: the smallest text below is 1.25rem
+     (24px), body text 1.5rem (29px), the Wi-Fi name and address 3rem (58px),
+     and the QR code is ~670px square, about 18px per module. */
+  html { font-size: min(1vw, 1.7778vh); }
+  html, body { height: 100%; overflow: hidden; }
+  body { display: flex; flex-direction: column; }
+
+  header { flex: 0 0 auto; display: flex; align-items: center; gap: 2rem;
+    padding: 1.6rem 4rem 0; }
+  header .brand-logo { width: auto; height: 6rem; }
+  header h1 { font-size: 3.4rem; letter-spacing: -0.02em; line-height: 1.1; }
+
+  .main { flex: 1 1 auto; min-height: 0; display: grid;
+    grid-template-columns: minmax(0, 1fr) auto; gap: 4rem;
+    padding: 1rem 4rem; align-items: center; }
+
+  .steps { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; }
+  .step { display: flex; gap: 1.6rem; align-items: flex-start; }
+  .n { flex: 0 0 auto; width: 3.4rem; height: 3.4rem; border-radius: 50%;
+    background: var(--accent); color: #08111f; font-weight: 900; font-size: 1.9rem;
+    display: flex; align-items: center; justify-content: center; }
+  .step .body { flex: 1; min-width: 0; }
+  .step .lab { font-size: 1.25rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--dim); font-weight: 800; }
+  .step .val { font-size: 3rem; font-weight: 850; line-height: 1.12;
+    letter-spacing: -0.02em; margin-top: 0.3rem; overflow-wrap: anywhere; }
+  .step .val.text { font-size: 2.6rem; }
+  .step .hint { font-size: 1.4rem; color: var(--dim); margin-top: 0.3rem; }
+  .wifi .val { color: #63e089; }
+  .wifi .val.unknown { color: var(--amber); font-size: 2.2rem; font-family: inherit; }
+  .wifi .pw { font-size: 2rem; margin-top: 0.4rem; color: var(--fg); }
+  .wifi .pw b { font-family: var(--mono); color: #63e089; }
+  .url .val { color: #9dc7ff; }
+
+  .prep-list { list-style: none; padding: 0; margin: 0.5rem 0 0; }
+  .prep-list li { font-size: 1.55rem; line-height: 1.25; margin-bottom: 0.7rem;
+    padding-left: 1.8rem; position: relative; }
+  .prep-list li::before { content: "\25B8"; position: absolute; left: 0;
+    color: var(--accent); font-weight: 900; }
+  .prep-list .where { display: block; font-size: 1.3rem; line-height: 1.3;
+    color: var(--dim); margin-top: 0.15rem; }
+
+  .qrwrap { text-align: center; }
+  .qrcard { background: #fff; padding: 1.2rem; border-radius: 1.4rem;
+    box-shadow: 0 1.2rem 3rem rgba(0, 0, 0, 0.55); }
+  .qrcard img { display: block; width: 35rem; height: 35rem; }
+  .qrcap { font-size: 1.7rem; margin-top: 1rem; font-weight: 800;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--fg); }
+
+  footer { flex: 0 0 auto; display: flex; align-items: center;
+    justify-content: space-between; gap: 2rem; padding: 1rem 4rem;
+    border-top: 2px solid var(--line); background: var(--bg2); }
+  .counter { font-size: 2rem; font-weight: 850; }
+  .counter b { color: #63e089; font-family: var(--mono); }
+  .warnrow { font-size: 1.4rem; color: var(--amber); font-weight: 750; }
+  footer .chip { font-size: 1.15rem; padding: 0.4rem 1.1rem; }
+
+  /* squarer projectors (4:3, 16:10): narrower composition, smaller QR */
+  @media (max-aspect-ratio: 3/2) and (min-width: 761px) {
+    html { font-size: min(1.25vw, 1.7778vh); }
+    .main { gap: 3rem; padding: 1rem 3rem; }
+    header, footer { padding-left: 3rem; padding-right: 3rem; }
+    .qrcard img { width: 28rem; height: 28rem; }
+    .step .val { font-size: 2.4rem; }
+    .step .val.text { font-size: 2.1rem; }
+    .prep-list li { font-size: 1.35rem; }
+  }
+
+  /* a phone or a narrow window: stack, scroll, normal sizes */
+  @media (max-width: 760px) {
+    html { font-size: 16px; }
+    html, body { height: auto; min-height: 100%; overflow: auto; }
+    header { padding: 12px 5vw 0; gap: 12px; }
+    header .brand-logo { height: 52px; }
+    header h1 { font-size: 26px; }
+    .main { grid-template-columns: 1fr; gap: 20px; padding: 12px 5vw 20px; }
+    .steps { gap: 18px; }
+    .step { gap: 14px; }
+    .n { width: 32px; height: 32px; font-size: 16px; }
+    .step .lab { font-size: 11px; }
+    .step .val, .step .val.text { font-size: 24px; }
+    .wifi .val.unknown { font-size: 20px; }
+    .wifi .pw { font-size: 16px; }
+    .step .hint { font-size: 14px; }
+    .prep-list li { font-size: 15px; padding-left: 16px; }
+    .prep-list .where { font-size: 12px; }
+    .qrwrap { grid-row: 1; }
+    .qrcard { display: inline-block; padding: 12px; border-radius: 14px; }
+    .qrcard img { width: min(62vw, 240px); height: min(62vw, 240px); }
+    .qrcap { font-size: 14px; }
+    footer { flex-wrap: wrap; justify-content: center; padding: 10px 12px; gap: 8px 14px; }
+    .counter { font-size: 16px; }
+    .warnrow { font-size: 13px; }
+    footer .chip { font-size: 11px; padding: 4px 10px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <img class="brand-logo" src="/ACQ.png" alt="ACQ">
+  <h1 id="quizname">Quiz</h1>
+</header>
+
+<div class="main">
+  <div class="steps">
+    <div class="step wifi">
+      <div class="n">1</div>
+      <div class="body">
+        <div class="lab">Connect to this Wi-Fi</div>
+        <div class="val mono" id="ssid">&mdash;</div>
+        <div class="pw hidden" id="wifipw">Password: <b id="wifipwval"></b></div>
+      </div>
+    </div>
+    <div class="step url">
+      <div class="n">2</div>
+      <div class="body">
+        <div class="lab">Scan the code, or open this address</div>
+        <div class="val mono" id="joinurl">&mdash;</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="n">3</div>
+      <div class="body">
+        <div class="lab">Sign in</div>
+        <div class="val text">Team number + PIN</div>
+        <div class="hint">Both are on the slip at your table.</div>
+      </div>
+    </div>
+    <div class="step prep">
+      <div class="n">4</div>
+      <div class="body">
+        <div class="lab">Set your phone up before we start</div>
+        <ul class="prep-list">
+          <li><b>Screen timeout: maximum / Never</b>
+            <span class="where">iPhone: Settings &rsaquo; Display &amp; Brightness &rsaquo; Auto-Lock
+              &nbsp;&middot;&nbsp; Android: Settings &rsaquo; Display &rsaquo; Screen timeout</span></li>
+          <li><b>Do Not Disturb: ON</b>
+            <span class="where">a call or notification pulls you off the quiz screen</span></li>
+          <li><b>Mobile data: OFF</b>
+            <span class="where">stay on the quiz Wi-Fi only</span></li>
+          <li><b>&ldquo;No internet&rdquo; warning: tap Stay connected</b>
+            <span class="where">this Wi-Fi is private and has no internet on purpose</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="qrwrap">
+    <div class="qrcard"><img id="qr" alt="Scan to join the quiz"></div>
+    <div class="qrcap">Scan to join</div>
+  </div>
+</div>
+
+<footer>
+  <div class="counter"><b id="joined">0</b> of <b id="total">0</b> teams joined</div>
+  <div class="warnrow">One phone per team</div>
+  <span class="chip" id="statechip">WAITING</span>
+</footer>
+
+<script src="/live.js"></script>
+<script>
+(function () {
+  'use strict';
+  var P = window.PNB;
+  var qrFor = '';
+
+  function render(s) {
+    P.el('quizname').textContent = s.quiz_name || 'Quiz';
+    document.title = s.quiz_name || 'Join the Quiz';
+
+    var ssid = (s.wifi && s.wifi.ssid) || '';
+    var ssidEl = P.el('ssid');
+    ssidEl.textContent = ssid || 'ask the quizmaster';
+    ssidEl.className = ssid ? 'val mono' : 'val unknown';
+    var pw = (s.wifi && s.wifi.password) || '';
+    P.el('wifipwval').textContent = pw;
+    P.el('wifipw').classList.toggle('hidden', !pw);
+
+    var url = s.join_url || (location.origin + '/j');
+    // typed addresses do not need the scheme, and 'http://' costs a third of the width
+    P.el('joinurl').textContent = url.replace(/^https?:\/\//, '');
+    if (url !== qrFor) {
+      qrFor = url;
+      P.el('qr').src = '/qr.svg?url=' + encodeURIComponent(url);
+    }
+
+    P.el('joined').textContent = s.joined_count || 0;
+    P.el('total').textContent = s.team_count || 0;
+
+    var chip = P.el('statechip');
+    chip.className = 'chip ' + (s.phase !== 'LOBBY' ? 'green' : 'amber');
+    chip.textContent = s.phase !== 'LOBBY' ? 'QUIZ IN PROGRESS' : 'WAITING FOR TEAMS';
+  }
+
+  new P.Connection({
+    role: 'screen',
+    onState: function (s) { if (s.type !== 'ping') render(s); }
+  }).start();
+})();
+</script>
+</body>
+</html>

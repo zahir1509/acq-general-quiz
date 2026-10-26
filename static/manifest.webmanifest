@@ -1,0 +1,19 @@
+{
+  "name": "Prelims Quiz",
+  "short_name": "Quiz",
+  "description": "Team phone for a live multi-pass prelims quiz",
+  "start_url": "/j",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

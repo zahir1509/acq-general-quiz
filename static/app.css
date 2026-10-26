@@ -1,0 +1,177 @@
+/* Pounce & Bounce -- shared styles.
+   Built for a dim room and a hurried quizmaster: high contrast, big targets,
+   no animation that delays feedback. */
+
+:root {
+  --bg: #0d1117;
+  --bg2: #161b22;
+  --bg3: #1f262e;
+  --line: #2d3540;
+  --fg: #e8edf3;
+  --dim: #8b98a8;
+  --accent: #4c9aff;
+  --green: #2ea043;
+  --green-dim: #14401f;
+  --red: #e5484d;
+  --red-dim: #45161a;
+  --amber: #e3a008;
+  --amber-dim: #40300a;
+  --purple: #a371f7;
+  --radius: 10px;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body { min-height: 100vh; }
+
+.brand-logo { display: block; height: auto; object-fit: contain; }
+
+h1, h2, h3 { margin: 0; font-weight: 700; letter-spacing: -0.01em; }
+
+a { color: var(--accent); }
+
+/* ---------------------------------------------------------------- buttons */
+button, .btn {
+  /* .btn is used on <a> too, which is inline by default -- without this its
+     padding overflows and overlaps whatever sits below it. */
+  display: inline-block;
+  text-align: center;
+  text-decoration: none;
+  font: inherit;
+  font-weight: 650;
+  color: var(--fg);
+  background: var(--bg3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 18px;
+  cursor: pointer;
+  line-height: 1.2;
+  transition: background 0.08s, border-color 0.08s;
+}
+button:hover:not(:disabled) { background: #2b333d; }
+button:active:not(:disabled) { transform: translateY(1px); }
+button:disabled { opacity: 0.38; cursor: not-allowed; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #08111f; }
+.btn-primary:hover:not(:disabled) { background: #67acff; }
+.btn-green { background: var(--green); border-color: var(--green); color: #04120a; }
+.btn-green:hover:not(:disabled) { background: #36c052; }
+.btn-red { background: var(--red); border-color: var(--red); color: #fff; }
+.btn-red:hover:not(:disabled) { background: #f0666a; }
+.btn-amber { background: var(--amber); border-color: var(--amber); color: #1a1300; }
+.btn-ghost { background: transparent; }
+.btn-xl { padding: 20px 26px; font-size: 20px; font-weight: 800; letter-spacing: 0.02em; }
+.btn-sm { padding: 6px 11px; font-size: 13px; }
+.btn-block { display: block; width: 100%; }
+
+/* ----------------------------------------------------------------- inputs */
+input, textarea, select {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 11px 13px;
+  width: 100%;
+}
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(76, 154, 255, 0.18);
+}
+label { display: block; font-size: 12px; color: var(--dim); margin: 0 0 5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.05em; }
+.field { margin-bottom: 14px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.row > * { flex: 1; min-width: 0; }
+.row > .shrink { flex: 0 0 auto; }
+
+/* ------------------------------------------------------------------ cards */
+.card {
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px;
+}
+.card + .card { margin-top: 14px; }
+.card h2 {
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.09em;
+  color: var(--dim); margin-bottom: 12px;
+}
+
+/* ------------------------------------------------------------------ chips */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 750; letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 5px 11px; border-radius: 999px;
+  background: var(--bg3); border: 1px solid var(--line); color: var(--dim);
+  white-space: nowrap;
+}
+.chip.green { background: var(--green-dim); border-color: var(--green); color: #7ee295; }
+.chip.red { background: var(--red-dim); border-color: var(--red); color: #ff9b9e; }
+.chip.amber { background: var(--amber-dim); border-color: var(--amber); color: #f5cd60; }
+.chip.blue { background: #10243d; border-color: var(--accent); color: #9dc7ff; }
+.chip.purple { background: #23163d; border-color: var(--purple); color: #c9aeff; }
+
+/* ----------------------------------------------------------------- tables */
+table { width: 100%; border-collapse: collapse; }
+th {
+  text-align: left; font-size: 11px; text-transform: uppercase;
+  letter-spacing: 0.07em; color: var(--dim); font-weight: 700;
+  padding: 8px 10px; border-bottom: 1px solid var(--line);
+}
+td { padding: 9px 10px; border-bottom: 1px solid #1c232c; vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------------ utils */
+.muted { color: var(--dim); }
+.small { font-size: 13px; }
+.tiny { font-size: 11px; }
+.center { text-align: center; }
+.right { text-align: right; }
+.mono { font-family: var(--mono); }
+.hidden { display: none !important; }
+.grow { flex: 1; }
+.hstack { display: flex; gap: 10px; align-items: center; }
+.wrap { flex-wrap: wrap; }
+.pos { color: #7ee295; }
+.neg { color: #ff9b9e; }
+.spacer { flex: 1 1 auto; }
+.mt { margin-top: 14px; }
+.mb { margin-bottom: 14px; }
+
+/* ------------------------------------------------------------------ toast */
+#toast {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+  z-index: 90; display: flex; flex-direction: column; gap: 8px; align-items: center;
+  pointer-events: none;
+}
+.toast {
+  background: #232b35; border: 1px solid var(--line); color: var(--fg);
+  padding: 11px 18px; border-radius: 999px; font-weight: 650; font-size: 14px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5); max-width: 88vw;
+}
+.toast.err { background: var(--red-dim); border-color: var(--red); }
+.toast.ok { background: var(--green-dim); border-color: var(--green); }
+
+/* ------------------------------------------------------- offline banner */
+#offline {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: var(--red); color: #fff; text-align: center;
+  padding: 7px; font-weight: 750; font-size: 13px; letter-spacing: 0.04em;
+}

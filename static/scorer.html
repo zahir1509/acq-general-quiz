@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0d1117">
+<title>Scorer — Prelims Quiz</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+  body { padding-bottom: 40px; }
+  header { position: sticky; top: 0; z-index: 30; background: rgba(13,17,23,0.96);
+    backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  .hrow { display: flex; align-items: center; gap: 12px; padding: 10px 18px; flex-wrap: wrap; }
+  .logo { width: 84px; height: auto; flex: 0 0 auto; }
+  nav { display: flex; gap: 3px; flex-wrap: wrap; }
+  nav button { padding: 7px 12px; font-size: 13px; background: transparent;
+    border-color: transparent; color: var(--dim); }
+  nav button.on { background: var(--bg3); border-color: var(--line); color: var(--fg); }
+  nav button .n { background: var(--amber); color: #1a1300; border-radius: 999px; font-size: 11px;
+    padding: 1px 7px; margin-left: 5px; font-weight: 800; }
+  main { max-width: 1500px; margin: 0 auto; padding: 16px 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+  @media (max-width: 950px) { .grid2 { grid-template-columns: 1fr; } }
+  .login { max-width: 380px; margin: 12vh auto; }
+
+  /* ------------------------------------------------------------ stepper */
+  .stepper { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .stepper button { flex: 1 1 110px; padding: 12px 8px; font-size: 14px; font-weight: 800;
+    letter-spacing: .04em; }
+  .stepper button.on { background: var(--accent); border-color: var(--accent); color: #08111f; }
+  .stepper button.done { color: #7ee295; }
+
+  .qhead { display: flex; align-items: baseline; gap: 14px; margin-bottom: 8px; flex-wrap: wrap; }
+  .qbig { font-size: 38px; font-weight: 850; letter-spacing: -.03em; line-height: 1; }
+  .qtext { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px;
+    font-size: 18px; line-height: 1.45; margin-bottom: 12px; white-space: pre-wrap; }
+  .qans { font-size: 14px; color: var(--dim); margin-bottom: 12px; }
+  .qans b { color: #7ee295; font-size: 18px; }
+  .qnote { color: var(--amber); font-size: 13px; margin-top: 4px; }
+  .controls { display: flex; gap: 9px; flex-wrap: wrap; margin-bottom: 12px; align-items: stretch; }
+  .controls > button { flex: 1 1 130px; }
+  .controls .inl { display: flex; gap: 6px; align-items: center; flex: 0 1 auto; }
+  .controls .inl input { width: 74px; text-align: center; font-family: var(--mono); }
+  .bigtimer { font-family: var(--mono); font-size: 54px; font-weight: 850; font-variant-numeric: tabular-nums; }
+  .bigtimer.low { color: var(--red); }
+  .thumbs img { max-height: 70px; border-radius: 6px; margin-right: 6px; }
+  .mediabar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+
+  /* ------------------------------------------------------------- tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 5px; }
+  .tile { padding: 6px 0; font-size: 13px; font-weight: 800; text-align: center; border-radius: 8px;
+    background: var(--bg); border: 1px solid var(--line); color: #5a6672; position: relative;
+    cursor: default; font-family: var(--mono); }
+  .tile.joined { color: var(--amber); border-color: var(--amber); }
+  .tile.online { color: #7ee295; border-color: var(--green); }
+  .tile.ans { background: var(--green-dim); color: #b7f0c4; }
+  .tile small { display: block; font-size: 9px; font-weight: 600; opacity: .8; }
+  .legend { font-size: 12px; color: var(--dim); margin-top: 10px; display: flex; gap: 14px; flex-wrap: wrap; }
+
+  /* ------------------------------------------------------------ review */
+  .rvgrid { display: grid; grid-template-columns: 260px 1fr; gap: 14px; align-items: start; }
+  @media (max-width: 900px) { .rvgrid { grid-template-columns: 1fr; } }
+  .qlist { max-height: 76vh; overflow: auto; }
+  .qrow { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px;
+    cursor: pointer; font-size: 14px; border-bottom: 1px solid #1c232c; }
+  .qrow:hover { background: var(--bg3); }
+  .qrow.cur { background: rgba(76,154,255,0.16); }
+  .qrow .badge { margin-left: auto; }
+  .badge { font-family: var(--mono); font-size: 12px; font-weight: 800; background: var(--bg3);
+    border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
+  .badge.todo { background: var(--amber-dim); border-color: var(--amber); color: #f5cd60; }
+  .badge.done { color: #7ee295; border-color: var(--green); background: var(--green-dim); }
+  .cl { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line);
+    border-left: 5px solid var(--accent); border-radius: 10px; margin-bottom: 8px; background: var(--bg); }
+  .cl.sel { box-shadow: 0 0 0 2px var(--accent); }
+  .cl.full { border-left-color: var(--green); }
+  .cl.part { border-left-color: var(--amber); }
+  .cl.zero { border-left-color: var(--red); opacity: .8; }
+  .cl .lab { font-size: 18px; font-weight: 750; }
+  .cl .meta { font-size: 12px; color: var(--dim); margin-top: 2px; overflow-wrap: anywhere; }
+  .cl .main { flex: 1; min-width: 0; }
+  .cl .btns { display: flex; gap: 5px; flex: 0 0 auto; align-items: center; }
+  .cl .btns button { padding: 8px 12px; font-weight: 850; }
+  .cl .btns input { width: 62px; padding: 7px; text-align: center; font-family: var(--mono); }
+  .sug { color: #f5cd60; font-size: 12px; font-weight: 700; }
+  .count { font-family: var(--mono); background: var(--bg3); border-radius: 999px; padding: 1px 9px;
+    font-weight: 800; margin-right: 6px; }
+  .answers-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+
+  /* ------------------------------------------------------------ tables */
+  .scroll { max-height: 70vh; overflow: auto; }
+  .sbrow { cursor: pointer; }
+  .sbrow:hover td { background: var(--bg3); }
+  dialog { background: var(--bg2); color: var(--fg); border: 1px solid var(--line); border-radius: 14px;
+    padding: 22px; max-width: 760px; width: 94%; }
+  dialog::backdrop { background: rgba(0,0,0,0.66); }
+  .joinurl { font-family: var(--mono); font-size: 15px; word-break: break-all; background: var(--bg);
+    border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; margin-top: 9px; }
+  #qrbox img { width: 170px; height: 170px; border-radius: 8px; display: block; }
+  .logline { font-family: var(--mono); font-size: 12px; padding: 4px 0; border-bottom: 1px solid #1c232c; }
+  .kv { font-family: var(--mono); font-size: 12px; color: var(--dim); line-height: 1.8; }
+  .warnbox { background: var(--amber-dim); border: 1px solid var(--amber); color: #f5cd60;
+    border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<div id="offline" class="hidden">SERVER CONNECTION LOST &mdash; RECONNECTING…</div>
+
+<div id="loginView" class="login">
+  <div class="card">
+    <h2>Scorer sign in</h2>
+    <div class="field"><label for="pin">Scorer PIN</label>
+      <input id="pin" type="password" autocomplete="off" placeholder="PIN"></div>
+    <button id="loginBtn" class="btn-primary btn-block btn-xl">SIGN IN</button>
+    <div class="small muted mt">Printed in the terminal where the server started.</div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+<header>
+  <div class="hrow">
+    <img class="brand-logo logo" src="/ACQ.png" alt="ACQ">
+    <nav id="nav">
+      <button data-tab="run" class="on">RUN</button>
+      <button data-tab="review">REVIEW<span class="n hidden" id="navRv"></span></button>
+      <button data-tab="scores">SCORES</button>
+      <button data-tab="teams">TEAMS</button>
+      <button data-tab="questions">QUESTIONS</button>
+      <button data-tab="setup">SETUP</button>
+      <button data-tab="log">LOG</button>
+    </nav>
+    <div class="spacer"></div>
+    <span class="chip" id="chipPhase">—</span>
+    <span class="chip" id="chipTeams">—</span>
+  </div>
+</header>
+
+<main>
+<!-- ================================================================ RUN -->
+<section id="tab-run">
+  <div id="noContent" class="card center hidden">
+    <h2>Set up first</h2>
+    <div class="small muted mb" id="noContentMsg"></div>
+    <div class="row" style="max-width:460px;margin:0 auto 12px">
+      <div class="field grow" style="margin:0"><label for="teamCountIn">Number of teams</label>
+        <input id="teamCountIn" type="number" min="1" max="300" value="50"
+               style="font-size:24px;text-align:center;font-family:var(--mono)"></div>
+      <button id="genTeams" class="btn-primary shrink">CREATE TEAMS</button>
+    </div>
+    <a class="btn" href="#" data-jump="questions">ADD / IMPORT QUESTIONS</a>
+  </div>
+
+  <div id="runMain">
+    <div class="stepper" id="stepper"></div>
+    <div class="grid2" style="grid-template-columns: minmax(0,3fr) minmax(0,2fr)">
+      <div class="card" id="runCard"><div id="runCtl"></div></div>
+      <div>
+        <div class="card">
+          <h2>Teams <span class="muted" id="tilesSummary"></span></h2>
+          <div class="tiles" id="tiles"></div>
+          <div class="legend">
+            <span style="color:#5a6672">&#9632; not joined</span>
+            <span style="color:var(--amber)">&#9632; joined, offline</span>
+            <span style="color:#7ee295">&#9632; online</span>
+            <span id="legendAns">filled = answered this question</span>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Open on other screens</h2>
+          <div class="row">
+            <a id="lnkWelcome" class="btn btn-sm" target="_blank">WELCOME</a>
+            <a id="lnkScreen" class="btn btn-sm" target="_blank">PROJECTOR</a>
+            <a id="lnkBoard" class="btn btn-sm" target="_blank">SCOREBOARD</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================== REVIEW -->
+<section id="tab-review" class="hidden">
+  <div class="rvgrid">
+    <div class="card">
+      <h2>Questions</h2>
+      <div id="rvProgress" class="small muted mb"></div>
+      <div class="row mb">
+        <button id="rvNext" class="btn-sm btn-primary">NEXT TO REVIEW</button>
+        <button id="rvAllWrong" class="btn-sm btn-ghost">ALL REST = WRONG</button>
+      </div>
+      <div class="qlist" id="rvList"></div>
+    </div>
+    <div class="card">
+      <div id="rvHead"></div>
+      <div class="answers-head">
+        <label class="hstack shrink" style="margin:0;text-transform:none;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="rvShowAuto" style="width:auto;margin-right:6px">
+          show answers already decided
+        </label>
+        <input id="rvFilter" placeholder="filter answers" style="max-width:200px">
+        <button id="rvQWrong" class="btn-sm shrink">REST OF THIS QUESTION = WRONG</button>
+      </div>
+      <div class="tiny muted mb">Keys: &uarr; &darr; move &middot; <b>C</b> correct &middot;
+        <b>H</b> half &middot; <b>W</b> wrong &middot; <b>U</b> clear decision</div>
+      <div id="rvClusters"></div>
+      <div id="rvSilent" class="small muted mt"></div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================================== SCORES -->
+<section id="tab-scores" class="hidden">
+  <div class="card">
+    <div class="hstack mb wrap">
+      <h2 class="grow" style="margin:0">Scoreboard</h2>
+      <input id="scFilter" placeholder="find a team" style="max-width:200px">
+      <a id="csvLink" class="btn btn-sm" target="_blank">EXPORT CSV</a>
+      <a id="mxLink" class="btn btn-sm" target="_blank">TEAM x Q CSV</a>
+      <a id="jsonLink" class="btn btn-sm" target="_blank">EXPORT JSON</a>
+    </div>
+    <div class="scroll"><table><thead><tr><th>#</th><th>Team</th><th class="right">Score</th>
+      <th class="right">Answered</th><th class="right">Fully correct</th></tr></thead>
+      <tbody id="scBody"></tbody></table></div>
+    <div class="small muted mt">Click a team to see everything it wrote.</div>
+  </div>
+  <div class="card">
+    <h2>Manual adjustment</h2>
+    <div class="row">
+      <div class="field"><label for="adjTeam">Team number</label><input id="adjTeam" type="number" min="1"></div>
+      <div class="field"><label for="adjPts">Points (may be negative)</label><input id="adjPts" type="number" step="0.5"></div>
+      <div class="field grow"><label for="adjNote">Reason</label><input id="adjNote"></div>
+      <button id="adjBtn" class="btn-primary shrink">APPLY</button>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ TEAMS -->
+<section id="tab-teams" class="hidden">
+  <div class="grid2">
+    <div class="card">
+      <h2>Create all teams at once</h2>
+      <div class="row mb">
+        <div class="field grow" style="margin:0"><label for="genCount">Number of teams</label>
+          <input id="genCount" type="number" min="1" max="300" value="50"></div>
+        <button id="genTeams2" class="btn-primary shrink">CREATE</button>
+      </div>
+      <h2 class="mt">Add one more</h2>
+      <div class="row">
+        <div class="field"><label for="tNum">Number</label><input id="tNum" type="number" min="1"></div>
+        <div class="field grow"><label for="tName">Name</label><input id="tName"></div>
+        <button id="addTeam" class="btn-primary shrink">ADD</button>
+      </div>
+      <h2 class="mt">Paste names</h2>
+      <div class="field"><label for="bulkTeams">One per line &mdash; renames Team 1, Team 2, … in order</label>
+        <textarea id="bulkTeams" rows="7"></textarea></div>
+      <button id="bulkRename" class="btn-block">APPLY NAMES</button>
+      <div class="row mt">
+        <a id="cardsLink" class="btn btn-primary" target="_blank">PRINT JOIN SLIPS</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="hstack mb wrap"><h2 class="grow" style="margin:0"><span id="teamCount">0</span> teams</h2>
+        <input id="teamFilter" placeholder="find a team" style="max-width:180px"></div>
+      <div class="scroll"><div id="teamList"></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ QUESTIONS -->
+<section id="tab-questions" class="hidden">
+  <div class="grid2">
+    <div class="card">
+      <h2 id="qFormTitle">Add question</h2>
+      <input type="hidden" id="qId">
+      <div class="row">
+        <div class="field shrink" style="width:110px"><label for="qNum">Q number</label><input id="qNum" type="number" min="1"></div>
+        <div class="field"><label for="qPoints">Points (blank = default)</label><input id="qPoints" type="number" step="0.5"></div>
+      </div>
+      <div class="field"><label for="qText">Question</label><textarea id="qText" rows="3"></textarea></div>
+      <div class="field"><label for="qAns">Official answer</label><input id="qAns"></div>
+      <div class="field"><label for="qAlt">Also accepted (one per line)</label><textarea id="qAlt" rows="2"></textarea></div>
+      <div class="field"><label for="qMedia">Image / audio / video (comma separated, /media/...)</label><input id="qMedia" placeholder="/media/5.jpg"></div>
+      <div class="field"><label for="qNote">Quizmaster note (never shown to teams)</label><input id="qNote"></div>
+      <div class="row"><button id="qSave" class="btn-primary">SAVE QUESTION</button>
+        <button id="qClear" class="btn-ghost shrink">CLEAR FORM</button></div>
+
+      <h2 class="mt">Import questions from CSV</h2>
+      <div class="row mb">
+        <a href="/question-template.csv" class="btn btn-primary" download>&#11015; BLANK TEMPLATE</a>
+        <a href="/question-example.csv" class="btn btn-sm" download>filled example</a>
+      </div>
+      <div class="small muted mb">Columns are matched by name in any order:
+        <span class="mono">Question Number · Question · Answer · Also Accepted · Points · Image URL · Notes</span>.
+        Files named <span class="mono">5.jpg</span>, <span class="mono">5_1.png</span> or <span class="mono">5.mp3</span>
+        in <span class="mono">media/</span> attach to question 5 automatically; answer pictures go in
+        <span class="mono">media/answers/</span>.</div>
+      <div class="field"><input type="file" id="csvFile" accept=".csv,text/csv"></div>
+      <div class="field"><textarea id="csvText" rows="4" placeholder="…or paste CSV here"></textarea></div>
+      <div class="row">
+        <label class="hstack shrink" style="margin:0;text-transform:none;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="csvReplace" style="width:auto;margin-right:6px">replace all existing questions</label>
+        <button id="csvImport" class="btn-primary">IMPORT</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2><span id="qCount">0</span> questions &mdash; click to edit</h2>
+      <div class="scroll"><div id="qList"></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ SETUP -->
+<section id="tab-setup" class="hidden">
+  <div class="grid2">
+    <div>
+      <div class="card">
+        <h2>Quiz</h2>
+        <div class="field"><label for="cName">Quiz name</label><input id="cName"></div>
+        <div class="row">
+          <div class="field"><label for="cPts">Default points / question</label><input id="cPts" type="number" step="0.5"></div>
+          <div class="field"><label for="cP3">Pass 3 length (seconds)</label><input id="cP3" type="number" min="10"></div>
+          <div class="field"><label for="cQT">Question timer (seconds)</label><input id="cQT" type="number" min="5"></div>
+        </div>
+        <h2 class="mt">What phones show</h2>
+        <div class="field"><label for="cShowQ">Question text on phones</label>
+          <select id="cShowQ"><option value="1">Yes &mdash; teams read it on their phone</option>
+            <option value="0">No &mdash; question number only; read the projector</option></select></div>
+        <div class="field"><label for="cMedia">Pictures / audio / video on phones</label>
+          <select id="cMedia"><option value="0">No &mdash; projector only (recommended: keeps the Wi-Fi free)</option>
+            <option value="1">Yes &mdash; also send media to phones</option></select></div>
+        <div class="field"><label for="cResults">Show each team its marks after the reveal</label>
+          <select id="cResults"><option value="0">No</option><option value="1">Yes</option></select></div>
+        <div class="field"><label for="cSingle">One phone per team</label>
+          <select id="cSingle"><option value="1">Enforce (block a second phone)</option>
+            <option value="0">Allow</option></select></div>
+        <button id="saveCfg" class="btn-primary btn-block">SAVE SETTINGS</button>
+      </div>
+      <div class="card">
+        <h2>Scorer PIN</h2>
+        <div class="row">
+          <div class="field"><label for="pinCur">Current PIN</label><input id="pinCur" type="password" autocomplete="off"></div>
+          <div class="field"><label for="pinNew">New PIN</label><input id="pinNew" autocomplete="off"></div>
+          <button id="pinSave" class="btn-primary shrink">CHANGE</button>
+        </div>
+        <div class="tiny muted">Signs out every other scorer device. Teams are unaffected.</div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h2>Wi-Fi name &amp; join address</h2>
+        <div class="row">
+          <div class="field"><label for="cSsid">Wi-Fi name (shown on the welcome screen)</label><input id="cSsid"></div>
+          <div class="field"><label for="cWpw">Password (optional)</label><input id="cWpw"></div>
+        </div>
+        <div class="hstack" style="align-items:flex-start;gap:16px">
+          <div id="qrbox"></div>
+          <div class="grow"><div class="joinurl" id="joinUrl">—</div>
+            <div class="small muted mt">Co-scorers sign in at:</div>
+            <div class="joinurl" id="scorerUrl">—</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Server health</h2>
+        <div class="kv" id="health">—</div>
+      </div>
+      <div class="card">
+        <h2>Danger zone</h2>
+        <div class="small muted mb"><b>Clear answers</b> removes every answer and marking decision and returns
+          to the lobby. Teams and questions stay. An archive is written first.</div>
+        <button id="clearBtn" class="btn-red mb">CLEAR ANSWERS &amp; START OVER</button>
+        <div class="small muted mb" style="border-top:1px solid var(--line);padding-top:14px">
+          <b style="color:var(--red)">Master reset</b> also removes every team and question.</div>
+        <button id="masterBtn" class="btn-red btn-block">&#9888; MASTER RESET</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== LOG -->
+<section id="tab-log" class="hidden">
+  <div class="card"><h2>Audit trail</h2><div class="scroll"><div id="auditLog"></div></div></div>
+</section>
+</main>
+</div>
+
+<dialog id="sheetDlg">
+  <div class="hstack mb"><h2 id="sheetTitle" class="grow" style="margin:0"></h2>
+    <button id="sheetClose" class="btn-sm btn-ghost">CLOSE</button></div>
+  <div class="scroll" id="sheetBody"></div>
+</dialog>
+
+<script src="/live.js"></script>
+<script src="/scorer.js"></script>
+</body>
+</html>

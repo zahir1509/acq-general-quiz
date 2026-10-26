@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quiz — Screen</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+  /* Projector at the back of a room: huge type, very high contrast.
+     1rem = 1% of the width (or 1.78% of the height on a squarer screen). */
+  html { font-size: min(1vw, 1.7778vh); }
+  html, body { height: 100%; overflow: hidden; }
+  body { display: flex; flex-direction: column; }
+
+  .topbar { display: flex; align-items: center; gap: 2rem; padding: 1.4vh 3rem;
+    border-bottom: 2px solid var(--line); flex: 0 0 auto; min-height: 7vh; }
+  .where { font-size: 2.4rem; font-weight: 850; letter-spacing: -0.01em; }
+  .where small { color: var(--dim); font-weight: 700; font-size: 1.5rem; }
+  .quizname { font-size: 1.4rem; color: var(--dim); font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; }
+  .answered { font-size: 1.6rem; color: var(--dim); font-weight: 700; }
+  .answered b { color: #63e089; font-family: var(--mono); }
+  #timer { font-family: var(--mono); font-size: 3.6rem; font-weight: 850;
+    font-variant-numeric: tabular-nums; }
+  #timer.low { color: var(--red); }
+
+  .stage { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center;
+    padding: 2vh 5rem; min-height: 0; }
+  .qtext { font-size: 4.6rem; line-height: 1.24; font-weight: 700; letter-spacing: -0.02em;
+    max-height: 66vh; overflow: auto; white-space: pre-wrap; padding-bottom: .15em; }
+  .qtext.long { font-size: 3.4rem; }
+  .qtext.vlong { font-size: 2.6rem; }
+  .has-media .qtext { max-height: 30vh; font-size: 3.2rem; }
+  .has-media .qtext.long { font-size: 2.6rem; }
+  .has-media .qtext.vlong { font-size: 2.1rem; }
+  .gallery { display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+    gap: 1rem; margin-top: 2vh; }
+  .media { max-width: 100%; max-height: 46vh; border-radius: 12px; object-fit: contain; }
+  .media-video { width: min(78vw, 1000px); max-height: 42vh; background: #000; }
+  .media-audio { width: min(78vw, 900px); }
+
+  .center-block { text-align: center; }
+  .center-block h1 { font-size: 9rem; letter-spacing: -0.03em; line-height: 1; }
+  .center-block h2 { font-size: 3.4rem; color: var(--dim); margin-top: 2vh; font-weight: 700; }
+  .bigtimer { font-family: var(--mono); font-size: 16rem; font-weight: 850; line-height: 1;
+    font-variant-numeric: tabular-nums; margin: 2vh 0; }
+  .bigtimer.low { color: var(--red); }
+  .steps { list-style: none; padding: 0; margin: 3vh auto 0; max-width: 90rem; text-align: left; }
+  .steps li { font-size: 2.6rem; margin-bottom: 1.4vh; padding-left: 3rem; position: relative; }
+  .steps li::before { content: "\25B8"; position: absolute; left: 0; color: var(--accent); font-weight: 900; }
+
+  .lobby { display: flex; align-items: center; justify-content: center; gap: 6rem; }
+  .lobby h1 { font-size: 5.6rem; letter-spacing: -0.03em; }
+  .lobby p { font-size: 2.2rem; color: var(--dim); margin-top: 2vh; }
+  .joinbig { font-family: var(--mono); font-size: 2.8rem; margin-top: 3vh; background: var(--bg2);
+    border: 2px solid var(--line); border-radius: 14px; padding: 2vh 2rem; display: inline-block; }
+  .lobby .qrcard { background: #fff; padding: 1.2rem; border-radius: 1.4rem; flex: 0 0 auto; }
+  .lobby .qrcard img { display: block; width: 26rem; height: 26rem; }
+
+  .reveal { text-align: center; }
+  .reveal .q { font-size: 2.6rem; color: var(--dim); max-height: 22vh; overflow: hidden; }
+  .reveal .lab { font-size: 1.6rem; letter-spacing: .24em; text-transform: uppercase;
+    color: var(--dim); font-weight: 800; margin-top: 3vh; }
+  .reveal .ans { font-size: 7rem; font-weight: 850; color: #63e089; line-height: 1.1;
+    margin-top: 1.5vh; letter-spacing: -0.03em; }
+  .reveal .alts { font-size: 1.8rem; color: var(--dim); margin-top: 1.6vh; }
+  .rgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 2vh 3rem; }
+  .rcard { background: var(--bg2); border: 2px solid var(--line); border-radius: 14px;
+    padding: 1.6vh 2rem; min-height: 0; }
+  .rcard .n { font-size: 1.4rem; color: var(--dim); font-weight: 800; letter-spacing: .1em; }
+  .rcard .t { font-size: 1.6rem; color: var(--dim); max-height: 6.4rem; overflow: hidden; }
+  .rcard .a { font-size: 2.6rem; font-weight: 850; color: #63e089; margin-top: .6vh; }
+
+  #unlock { position: fixed; top: 1vh; left: 50%; transform: translateX(-50%); z-index: 50;
+    font-size: 1.4rem; padding: .8rem 2rem; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="where" id="where">—</div>
+  <div class="answered hidden" id="answered"></div>
+  <div class="spacer"></div>
+  <div id="timer"></div>
+  <div class="quizname" id="quizname"></div>
+</div>
+
+<div class="stage" id="stage"></div>
+<button id="unlock" class="btn-amber hidden">CLICK ONCE TO ENABLE SOUND &amp; PLAYBACK CONTROL</button>
+
+<script src="/live.js"></script>
+<script>
+(function () {
+  'use strict';
+  var P = window.WIZ, el = P.el, esc = P.esc;
+  var frame = null, lastKey = '', mediaKey = '', lastMediaN = null, unlocked = false;
+
+  // ------------------------------------------------------------ media
+  function galleryHtml(urls) {
+    return urls.map(function (u, i) {
+      var t = P.mediaType(u);
+      if (t === 'image') return '<img class="media" src="' + esc(u) + '" alt="">';
+      if (t === 'audio') return '<audio class="media media-audio" controls preload="auto" data-i="' + i + '" src="' + esc(u) + '"></audio>';
+      return '<video class="media media-video" controls playsinline preload="auto" data-i="' + i + '" src="' + esc(u) + '"></video>';
+    }).join('');
+  }
+  function players() { return document.querySelectorAll('#gallery audio, #gallery video'); }
+
+  function applyMedia(m) {
+    if (!m) return;
+    if (lastMediaN === null) { lastMediaN = m.n; return; }
+    if (m.n === lastMediaN) return;
+    lastMediaN = m.n;
+    var list = players(), p = list[m.idx || 0] || list[0];
+    if (!p) return;
+    var v = Number(m.value) || 0;
+    if (m.action === 'play') p.play().catch(needUnlock);
+    else if (m.action === 'pause') p.pause();
+    else if (m.action === 'restart') { p.currentTime = 0; p.play().catch(needUnlock); }
+    else if (m.action === 'seek') p.currentTime = Math.max(0, p.currentTime + v);
+    else if (m.action === 'volume') p.volume = Math.max(0, Math.min(1, v));
+    else if (m.action === 'mute') p.muted = true;
+    else if (m.action === 'unmute') p.muted = false;
+  }
+  function needUnlock() { if (!unlocked) el('unlock').classList.remove('hidden'); }
+  function unlock() { unlocked = true; el('unlock').classList.add('hidden'); }
+  el('unlock').addEventListener('click', function () {
+    // one real gesture lets later remote play() calls through
+    players().forEach(function (p) { p.muted = false; var w = p.play(); if (w && w.then) w.then(function () { p.pause(); }).catch(function () {}); });
+    unlock();
+  });
+  document.addEventListener('click', unlock);
+
+  // ----------------------------------------------------------- rendering
+  function sizeClass(text) {
+    var n = (text || '').length;
+    return n > 320 ? ' vlong' : n > 150 ? ' long' : '';
+  }
+
+  function render(s) {
+    frame = s;
+    el('quizname').textContent = s.quiz_name || '';
+    document.title = s.quiz_name || 'Quiz';
+    var st = el('stage'), where = el('where'), ans = el('answered');
+    var key = [s.phase, s.q ? s.q.n + s.q.text : '', s.reveal ? JSON.stringify(s.reveal) : '',
+               s.deadline ? 1 : 0, s.join_url, s.wifi && s.wifi.ssid,
+               s.phase === 'LOBBY' ? s.joined_count + '/' + s.team_count : ''].join('|');
+    ans.classList.add('hidden');
+
+    if (s.phase === 'PASS1' || s.phase === 'PASS2') {
+      where.innerHTML = 'Pass ' + s.phase.slice(4) + ' <small>· Question ' + s.pos + ' of ' + s.total + '</small>';
+      if (s.answered != null) {
+        ans.innerHTML = '<b>' + s.answered + '</b> of ' + s.joined_count + ' teams have answered';
+        ans.classList.remove('hidden');
+      }
+    } else if (s.phase === 'PASS3') where.textContent = 'Pass 3';
+    else if (s.phase === 'LOCKED') where.textContent = 'Answers locked';
+    else if (s.phase === 'REVEAL') where.textContent = 'The answers';
+    else where.textContent = 'Waiting to start';
+
+    if (key !== lastKey) {
+      lastKey = key;
+      var q = s.q, html = '';
+      if (s.phase === 'LOBBY') {
+        html = '<div class="lobby"><div><h1>' + esc(s.quiz_name || 'Quiz') + '</h1>' +
+          '<p>Teams: join the quiz on your phone</p>' +
+          '<p>Wi-Fi: <b style="color:var(--fg)">' + esc((s.wifi && s.wifi.ssid) || '—') + '</b></p>' +
+          '<div class="joinbig">' + esc((s.join_url || '').replace(/^https?:\/\//, '')) + '</div>' +
+          '<p><b style="color:var(--fg)">' + s.joined_count + '</b> of ' + s.team_count + ' teams joined</p></div>' +
+          '<div class="qrcard"><img alt="" src="/qr.svg?url=' + encodeURIComponent(s.join_url || '') + '"></div></div>';
+        mediaKey = '';
+      } else if ((s.phase === 'PASS1' || s.phase === 'PASS2') && q) {
+        var media = q.images || [];
+        html = '<div class="' + (media.length ? 'has-media' : '') + '"><div class="qtext' + sizeClass(q.text) +
+          '">' + esc(q.text || '') + '</div><div id="gallery" class="gallery">' +
+          galleryHtml(media) + '</div></div>';
+        mediaKey = JSON.stringify(media);
+      } else if (s.phase === 'PASS3') {
+        html = '<div class="center-block"><h1>PASS 3</h1>' +
+          '<div id="p3timer" class="bigtimer">' + (s.deadline ? '' : P.mmss(s.pass3_seconds)) + '</div>' +
+          '<ul class="steps"><li>Pick <b>any question</b> on your phone</li>' +
+          '<li>Type or change your answer &mdash; your <b>latest answer</b> counts</li>' +
+          '<li>Your notes from earlier passes are shown for reference</li>' +
+          '<li>Answers lock when the timer hits <b>0:00</b></li></ul></div>';
+      } else if (s.phase === 'LOCKED') {
+        html = '<div class="center-block"><h1>🔒</h1><h2>Answers are locked.<br>Marking in progress&hellip;</h2></div>';
+      } else if (s.phase === 'REVEAL' && s.reveal) {
+        html = revealHtml(s.reveal);
+      }
+      st.innerHTML = html;
+    }
+    applyMedia(s.media);
+    tick();
+  }
+
+  function revealHtml(r) {
+    if (r.view === 'list') {
+      return '<div class="rgrid">' + r.items.map(function (it) {
+        return '<div class="rcard"><div class="n">Q' + it.n + '</div><div class="t">' + esc(it.text) +
+          '</div><div class="a">' + esc(it.answer) + '</div></div>';
+      }).join('') + '</div><div class="muted center" style="margin-top:2vh;font-size:1.4rem">Page ' +
+        (r.page + 1) + ' of ' + r.pages + '</div>';
+    }
+    var it = r.item;
+    if (!it) return '<div class="center-block"><h2>Ready to reveal</h2></div>';
+    var alts = (it.alts || []).length ? 'Also accepted: ' + it.alts.map(esc).join(' · ') : '';
+    var imgs = (it.answer_images || []).map(function (u) {
+      return P.mediaType(u) === 'image' ? '<img class="media" src="' + esc(u) + '" alt="">' : '';
+    }).join('');
+    return '<div class="reveal"><div class="q">Q' + it.n + '. ' + esc(it.text) + '</div>' +
+      '<div class="lab">Answer</div><div class="ans">' + esc(it.answer || '—') + '</div>' +
+      '<div class="alts">' + alts + '</div><div class="gallery">' + imgs + '</div></div>';
+  }
+
+  // ------------------------------------------------------------ countdown
+  function tick() {
+    var s = frame, t = el('timer'), big = el('p3timer');
+    if (!s) return;
+    var show = !!s.deadline && ['PASS1', 'PASS2', 'PASS3'].indexOf(s.phase) >= 0;
+    var left = show ? s.deadline - P.now() : 0;
+    t.textContent = show && !big ? P.mmss(left) : '';
+    t.className = left < 15 ? 'low' : '';
+    if (big && show) { big.textContent = P.mmss(left); big.className = 'bigtimer' + (left < 15 ? ' low' : ''); }
+  }
+  setInterval(tick, 250);
+
+  new P.Connection({ role: 'screen', onState: function (s) { if (s.type !== 'ping') render(s); } }).start();
+})();
+</script>
+</body>
+</html>

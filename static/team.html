@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="/manifest.webmanifest">
+<title>Quiz</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+  body { padding-bottom: 40px; }
+  header { position: sticky; top: 0; z-index: 20; background: rgba(13,17,23,0.97);
+    border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; }
+  header .tno { font-weight: 850; font-size: 17px; }
+  header .tname { color: var(--dim); font-size: 14px; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; flex: 1; }
+  #sync { font-size: 12px; font-weight: 750; letter-spacing: .04em; padding: 5px 10px;
+    border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
+  #sync.ok { color: #7ee295; border-color: var(--green); background: var(--green-dim); }
+  #sync.busy { color: #f5cd60; border-color: var(--amber); background: var(--amber-dim); }
+  #sync.bad { color: #ff9b9e; border-color: var(--red); background: var(--red-dim); }
+  main { max-width: 640px; margin: 0 auto; padding: 14px; }
+  .passbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .pass { font-size: 12px; font-weight: 850; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent); }
+  .qnum { font-size: 13px; color: var(--dim); font-weight: 700; }
+  #timer { margin-left: auto; font-family: var(--mono); font-size: 22px; font-weight: 850;
+    font-variant-numeric: tabular-nums; }
+  #timer.low { color: var(--red); }
+  .qcard { font-size: 20px; line-height: 1.4; font-weight: 650; white-space: pre-wrap;
+    margin-bottom: 14px; }
+  .qcard.plain { color: var(--dim); font-size: 16px; font-weight: 600; }
+  .qimg { max-width: 100%; border-radius: 10px; margin-bottom: 14px; display: block; }
+  textarea { font-size: 17px; resize: none; }
+  textarea.ans { font-size: 19px; font-weight: 650; min-height: 64px; }
+  .fl { display: flex; align-items: baseline; justify-content: space-between; }
+  .qs { font-size: 12px; font-weight: 700; }
+  .qs.ok { color: #7ee295; } .qs.busy { color: #f5cd60; } .qs.bad { color: #ff9b9e; }
+  .note { background: var(--bg2); border: 1px dashed var(--line); border-radius: 10px;
+    padding: 10px 12px; font-size: 15px; white-space: pre-wrap; color: var(--dim); }
+  .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 9px; margin-top: 12px; }
+  .chip-q { position: relative; padding: 14px 0; font-size: 18px; font-weight: 800;
+    border-radius: 12px; background: var(--bg3); border: 1px solid var(--line); color: var(--dim); }
+  .chip-q.done { background: var(--green-dim); border-color: var(--green); color: #7ee295; }
+  .chip-q .dot { position: absolute; top: 5px; right: 6px; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--amber); }
+  .big { text-align: center; padding: 56px 10px; }
+  .big h1 { font-size: 26px; margin-bottom: 10px; }
+  .big p { color: var(--dim); font-size: 16px; line-height: 1.5; }
+  .warn { background: var(--amber-dim); border: 1px solid var(--amber); color: #f5cd60;
+    border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-top: 14px; }
+  .rv { border-bottom: 1px solid var(--line); padding: 12px 0; }
+  .rv .a { color: #7ee295; font-weight: 800; font-size: 18px; }
+  .rv .m { color: var(--dim); font-size: 14px; margin-top: 2px; }
+  .pts { float: right; font-family: var(--mono); font-weight: 850; }
+  .back { margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<div id="offline" class="hidden">CONNECTION LOST &mdash; your answers are kept and will send when it returns</div>
+<header>
+  <span class="tno" id="tno">Team</span>
+  <span class="tname" id="tname"></span>
+  <span id="sync" class="ok">SAVED</span>
+</header>
+<main id="stage"></main>
+
+<script src="/live.js"></script>
+<script>
+(function () {
+  'use strict';
+  var W = window.WIZ, el = W.el, esc = W.esc;
+
+  var token = localStorage.getItem('wiz_team_token');
+  if (!token) { location.replace('/j'); return; }
+  var teamNo = localStorage.getItem('wiz_team_number') || '?';
+  el('tno').textContent = 'Team ' + teamNo;
+  el('tname').textContent = localStorage.getItem('wiz_team_name') || '';
+
+  // ------------------------------------------------------------ local state
+  // Everything typed lives in localStorage first and is sent to the server
+  // second, so a dropped connection, a reload or a dead tab loses nothing.
+  var KD = 'wiz_drafts_' + teamNo, KQ = 'wiz_qs_' + teamNo;
+  function load(k) { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch (e) { return {}; } }
+  var drafts = load(KD);            // n -> {answer, hint, rev, srev, ts, rejected}
+  var qs = load(KQ);                // n -> {n, text?, images?}
+  var frame = null;
+  var openQ = null;                 // question open in pass 3
+  var phaseSeen = null;
+
+  function persist() {
+    try { localStorage.setItem(KD, JSON.stringify(drafts)); localStorage.setItem(KQ, JSON.stringify(qs)); }
+    catch (e) {}
+  }
+  function draft(n) {
+    return drafts[n] || (drafts[n] = { answer: '', hint: '', rev: 0, srev: 0, ts: 0 });
+  }
+
+  // ----------------------------------------------------------------- sync
+  var inflight = false, fails = 0, flushTimer = null;
+
+  function dirtyItems() {
+    var out = [];
+    Object.keys(drafts).forEach(function (n) {
+      var d = drafts[n];
+      if (d.rev > d.srev && !d.rejected) {
+        out.push({ q: Number(n), answer: d.answer, hint: d.hint, rev: d.rev, ts: d.ts });
+      }
+    });
+    return out;
+  }
+  function pendingCount() {
+    return Object.keys(drafts).filter(function (n) { return drafts[n].rev > drafts[n].srev; }).length;
+  }
+  function rejectedCount() {
+    return Object.keys(drafts).filter(function (n) {
+      return drafts[n].rejected && drafts[n].rev > drafts[n].srev;
+    }).length;
+  }
+
+  function edit(n, field, value) {
+    var d = draft(n);
+    if (d[field] === value) return;
+    d[field] = value;
+    d.rev = Math.max(d.rev + 1, Math.floor(Date.now() / 1000));
+    d.ts = W.now();
+    d.rejected = false;
+    persist();
+    schedule(800 + Math.random() * 400);     // random, so 100 phones never save in lockstep
+    syncUi();
+  }
+
+  function schedule(ms) { clearTimeout(flushTimer); flushTimer = setTimeout(flush, ms); }
+
+  function backoff() { return Math.min(15000, 1000 * Math.pow(2, Math.min(fails, 4))) * (0.7 + Math.random() * 0.6); }
+
+  function flush() {
+    clearTimeout(flushTimer);
+    if (inflight) return;
+    var items = dirtyItems().slice(0, 40);
+    if (!items.length) { fails = 0; syncUi(); return; }
+    inflight = true;
+    syncUi();
+    W.post('/api/team/save', { items: items }, token).then(function (r) {
+      inflight = false; fails = 0;
+      (r.results || []).forEach(function (x) {
+        var d = drafts[x.q];
+        if (!d) return;
+        var sent = items.filter(function (i) { return i.q === x.q; })[0];
+        if (x.status === 'ok' && sent) {
+          d.srev = Math.max(d.srev, sent.rev);
+        } else if (x.status === 'stale') {
+          if (x.rev > d.srev) { d.answer = x.answer; d.hint = x.hint; d.rev = d.srev = x.rev; refreshInputs(x.q); }
+        } else {
+          d.rejected = r.phase || true;
+        }
+      });
+      persist(); syncUi();
+      if (dirtyItems().length) schedule(250);
+    }).catch(function (e) {
+      inflight = false;
+      if (e.status === 401) return logout();
+      if (e.status === 429) { schedule(400 + Math.random() * 600); return; }   // asked to slow down: not a failure
+      fails++;
+      schedule(backoff());
+      syncUi();
+    });
+  }
+
+  function flushOnLeave() {
+    var items = dirtyItems();
+    if (!items.length) return;
+    try {
+      fetch('/api/team/save', { method: 'POST', keepalive: true,
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ items: items.slice(0, 40) }) });
+    } catch (e) {}
+  }
+
+  function logout() { localStorage.removeItem('wiz_team_token'); location.replace('/j'); }
+
+  function syncUi() {
+    var s = el('sync'), n = pendingCount(), rej = rejectedCount();
+    var cls, txt;
+    if (rej) { cls = 'bad'; txt = 'NOT SAVED'; }
+    else if (n && fails) { cls = 'bad'; txt = 'RETRYING (' + n + ')'; }
+    else if (n) { cls = 'busy'; txt = 'SAVING…'; }
+    else { cls = 'ok'; txt = 'ALL SAVED ✓'; }
+    s.className = cls; s.textContent = txt;
+    var q = el('qstatus');
+    if (q && openN != null) {
+      var d = draft(openN);
+      if (d.rejected && d.rev > d.srev) { q.className = 'qs bad'; q.textContent = '⚠ Not saved — answers are closed'; }
+      else if (d.rev > d.srev) { q.className = 'qs ' + (fails ? 'bad' : 'busy'); q.textContent = fails ? '⚠ Not sent yet — retrying' : 'Saving…'; }
+      else { q.className = 'qs ok'; q.textContent = d.answer ? '✓ Saved' : ''; }
+    }
+    updateChips();
+  }
+
+  // ------------------------------------------------------------- questions
+  var cvLoaded = null, qFetching = false;
+  function ensureQuestions() {
+    if (!frame || ['PASS3', 'LOCKED', 'REVEAL'].indexOf(frame.phase) < 0) return;
+    if (cvLoaded === frame.cv || qFetching) return;
+    qFetching = true;
+    var cv = frame.cv;
+    setTimeout(function () {
+      W.get('/api/team/questions', token).then(function (r) {
+        (r.questions || []).forEach(function (q) { qs[q.n] = q; });
+        cvLoaded = cv; persist(); render(true);
+      }).catch(function (e) { if (e.status === 401) logout(); })
+        .then(function () { qFetching = false; });
+    }, Math.random() * 800);
+  }
+  setInterval(ensureQuestions, 3000);
+
+  function qList() {
+    return Object.keys(qs).map(Number).sort(function (a, b) { return a - b; });
+  }
+
+  // ------------------------------------------------------------- rendering
+  var openN = null;           // question whose inputs are on screen
+  var lastKey = '', lastViewId = '';
+  var revealItems = null, revealFor = null, revealMeta = {};
+
+  function media(q) {
+    var h = '';
+    (q.images || []).forEach(function (u) {
+      if (W.mediaType(u) === 'image') h += '<img class="qimg" loading="lazy" src="' + esc(u) + '" alt="">';
+      else if (W.mediaType(u) === 'audio') h += '<audio class="qimg" controls preload="none" src="' + esc(u) + '"></audio>';
+      else h += '<video class="qimg" controls playsinline preload="metadata" src="' + esc(u) + '"></video>';
+    });
+    return h;
+  }
+
+  function questionBlock(n) {
+    var q = qs[n] || { n: n };
+    var h = q.text !== undefined
+      ? '<div class="qcard">' + esc(q.text) + '</div>'
+      : '<div class="qcard plain">Question ' + n + ' — look at the main screen</div>';
+    return h + media(q);
+  }
+
+  function editor(n, hintEditable) {
+    var d = draft(n);
+    var h = questionBlock(n);
+    h += '<div class="field"><div class="fl"><label for="ans">Your answer</label>' +
+         '<span id="qstatus" class="qs"></span></div>' +
+         '<textarea id="ans" class="ans" rows="2" maxlength="300" autocomplete="off" autocorrect="off" ' +
+         'autocapitalize="sentences" spellcheck="false" enterkeyhint="done" placeholder="Type your answer"></textarea></div>';
+    if (hintEditable) {
+      h += '<div class="field"><label for="hint">Notes to yourself (only you see this)</label>' +
+           '<textarea id="hint" rows="3" maxlength="500" autocomplete="off" spellcheck="false" ' +
+           'placeholder="Ideas, half-remembered answers… shown again in the next pass"></textarea></div>';
+    } else if (d.hint) {
+      h += '<div class="field"><label>Your notes from earlier</label><div class="note">' + esc(d.hint) + '</div></div>';
+    }
+    return h;
+  }
+
+  function bindEditor(n, hintEditable) {
+    openN = n;
+    var a = el('ans'), hh = el('hint');
+    a.value = draft(n).answer;
+    a.addEventListener('input', function () { edit(n, 'answer', a.value); });
+    a.addEventListener('blur', flush);
+    a.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); a.blur(); } });
+    if (hintEditable && hh) {
+      hh.value = draft(n).hint;
+      hh.addEventListener('input', function () { edit(n, 'hint', hh.value); });
+      hh.addEventListener('blur', flush);
+    }
+    syncUi();
+  }
+
+  function refreshInputs(n) {
+    if (openN !== n) return;
+    var a = el('ans'), hh = el('hint');
+    if (a && document.activeElement !== a) a.value = draft(n).answer;
+    if (hh && document.activeElement !== hh) hh.value = draft(n).hint;
+  }
+
+  function bar(label, extra) {
+    return '<div class="passbar"><span class="pass">' + label + '</span>' +
+           '<span class="qnum">' + (extra || '') + '</span><span id="timer"></span></div>';
+  }
+
+  function updateChips() {
+    var chips = document.querySelectorAll('.chip-q');
+    for (var i = 0; i < chips.length; i++) {
+      var n = chips[i].getAttribute('data-n'), d = drafts[n];
+      chips[i].classList.toggle('done', !!(d && d.answer));
+      var dot = chips[i].querySelector('.dot');
+      if (d && d.hint && !dot) chips[i].insertAdjacentHTML('beforeend', '<span class="dot"></span>');
+    }
+  }
+
+  function render(force) {
+    if (!frame) return;
+    var f = frame, st = el('stage');
+    var key = [f.phase, f.q ? f.q.n : '', openQ, f.deadline ? 1 : 0, f.show_text, f.cv,
+               f.phase === 'REVEAL' ? f.reveal_q : '', qList().length].join('|');
+    if (key === lastKey && !force) { tickTimer(); return; }
+    // never rebuild the page under a finger that is typing
+    var viewId = [f.phase, f.q ? f.q.n : '', openQ].join('|');
+    var typing = document.activeElement && /^(TEXTAREA|INPUT)$/.test(document.activeElement.tagName);
+    if (typing && viewId === lastViewId) { return; }
+    lastKey = key; lastViewId = viewId; phaseSeen = f.phase; openN = null;
+    if (dirtyItems().length) schedule(50);
+    if (f.q) qs[f.q.n] = f.q;
+
+    if (f.phase === 'LOBBY') {
+      st.innerHTML = '<div class="big"><h1>You are in ✓</h1><p>' + esc(f.quiz_name || '') +
+        '<br>Waiting for the quizmaster to start. Keep this page open.</p></div>';
+    } else if ((f.phase === 'PASS1' || f.phase === 'PASS2') && f.q) {
+      st.innerHTML = bar('Pass ' + f.phase.slice(4), 'Question ' + f.pos + ' of ' + f.total) +
+        editor(f.q.n, true);
+      bindEditor(f.q.n, true);
+    } else if (f.phase === 'PASS3') {
+      if (!f.deadline) {
+        st.innerHTML = bar('Pass 3') + '<div class="big"><h1>Pass 3 is about to begin</h1>' +
+          '<p>You will be able to open any question and finish your answers.<br>' +
+          'Wait for the quizmaster to start the timer.</p></div>';
+      } else if (openQ != null) {
+        st.innerHTML = bar('Pass 3', 'Question ' + openQ) +
+          '<button class="back btn-sm" id="back">← All questions</button>' + editor(openQ, false);
+        bindEditor(openQ, false);
+        el('back').addEventListener('click', function () { flush(); openQ = null; render(true); });
+      } else {
+        var h = bar('Pass 3', 'Tap a question') + '<div class="grid">';
+        qList().forEach(function (n) {
+          h += '<button class="chip-q" data-n="' + n + '">' + n + '</button>';
+        });
+        h += '</div>';
+        if (!qList().length) h += '<div class="big"><p>Loading questions…</p></div>';
+        st.innerHTML = h;
+        st.querySelectorAll('.chip-q').forEach(function (b) {
+          b.addEventListener('click', function () { openQ = Number(b.getAttribute('data-n')); render(true); });
+        });
+        updateChips();
+      }
+    } else if (f.phase === 'LOCKED') {
+      var answered = Object.keys(drafts).filter(function (n) { return drafts[n].answer; }).length;
+      st.innerHTML = '<div class="big"><h1>Answers locked 🔒</h1><p>' + answered + ' of ' + f.total +
+        ' questions answered.<br>Eyes on the main screen.</p></div>' +
+        '<div id="lockwarn" class="warn hidden"></div>';
+    } else if (f.phase === 'REVEAL') {
+      st.innerHTML = '<div id="revealBox"></div>';
+      loadReveal();
+    } else {
+      st.innerHTML = '<div class="big"><p>Waiting…</p></div>';
+    }
+    tickTimer(); syncUi();
+  }
+
+  // ------------------------------------------------------------- countdown
+  function tickTimer() {
+    var t = el('timer');
+    if (!t || !frame || !frame.deadline) { if (t) t.textContent = ''; return; }
+    var left = frame.deadline - W.now();
+    t.textContent = W.mmss(left);
+    t.className = left < 15 ? 'low' : '';
+  }
+  setInterval(tickTimer, 250);
+
+  setInterval(function () {
+    var w = el('lockwarn');
+    if (!w) return;
+    var n = pendingCount();
+    w.classList.toggle('hidden', !n);
+    if (n) w.textContent = n + ' answer(s) are still being sent. Keep this page open and stay on the Wi-Fi.';
+  }, 1000);
+
+  // ---------------------------------------------------------------- reveal
+  function loadReveal() {
+    var f = frame;
+    if (revealFor === f.reveal_q && revealItems) return paintReveal();
+    setTimeout(function () {
+      W.get('/api/team/reveal', token).then(function (r) {
+        revealItems = r.items || []; revealFor = f.reveal_q; revealMeta = r; paintReveal();
+      }).catch(function (e) { if (e.status === 401) logout(); });
+    }, Math.random() * 1200);
+  }
+  function paintReveal() {
+    var b = el('revealBox');
+    if (!b || !revealItems) return;
+    var h = '';
+    if (revealMeta.total !== undefined) {
+      h += '<div class="card center mb"><div class="muted small">YOUR SCORE</div>' +
+        '<div style="font-size:40px;font-weight:850">' + revealMeta.total + '</div>' +
+        '<div class="muted">Rank ' + revealMeta.rank + ' of ' + revealMeta.of + '</div></div>';
+    }
+    revealItems.slice().reverse().forEach(function (it) {
+      h += '<div class="rv"><div class="muted small">Q' + it.n +
+        (it.points !== undefined ? '<span class="pts ' + (it.points > 0 ? 'pos' : 'muted') + '">' +
+          W.fmtPoints(it.points) + '</span>' : '') + '</div>' +
+        (it.text ? '<div>' + esc(it.text) + '</div>' : '') +
+        '<div class="a">' + esc(it.answer) + '</div>' +
+        '<div class="m">You wrote: ' + (it.mine ? esc(it.mine) : '—') + '</div></div>';
+    });
+    b.innerHTML = h || '<div class="big"><p>Answers will appear here as they are revealed.</p></div>';
+  }
+
+  // ------------------------------------------------------------ connection
+  function onFrame(s) {
+    if (s.type === 'ping') return;
+    var changed = !frame || frame.phase !== s.phase;
+    frame = s;
+    if (changed) {
+      Object.keys(drafts).forEach(function (n) { drafts[n].rejected = false; });
+      if (s.phase !== 'PASS3') openQ = null;
+      if (dirtyItems().length) schedule(200);
+    }
+    if (s.q) qs[s.q.n] = s.q;
+    render(false);
+    ensureQuestions();
+  }
+
+  // Merge what the server already holds, so a reload or a second phone resumes cleanly.
+  function resume() {
+    W.get('/api/team/me', token).then(function (r) {
+      (r.answers || []).forEach(function (a) {
+        var d = draft(a.q);
+        if (a.rev >= d.rev) { d.answer = a.answer; d.hint = a.hint; d.rev = a.rev; d.srev = a.rev; }
+        else d.srev = Math.max(d.srev, a.rev);
+      });
+      persist(); syncUi();
+      if (dirtyItems().length) schedule(200);
+      render(true);
+    }).catch(function (e) {
+      if (e.status === 401) logout(); else setTimeout(resume, 2000 + Math.random() * 2000);
+    });
+  }
+
+  new W.Connection({ role: 'team', token: token, onState: onFrame, onAuthFail: logout }).start();
+  resume();
+
+  window.addEventListener('pagehide', flushOnLeave);
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) flushOnLeave(); else { flush(); keepAwake(); }
+  });
+  window.addEventListener('online', function () { fails = 0; flush(); });
+
+  var lock = null;
+  function keepAwake() {
+    try {
+      if (navigator.wakeLock && !document.hidden) {
+        navigator.wakeLock.request('screen').then(function (l) { lock = l; }).catch(function () {});
+      }
+    } catch (e) {}
+  }
+  keepAwake();
+  syncUi();
+})();
+</script>
+</body>
+</html>

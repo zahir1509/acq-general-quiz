@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scoreboard</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+  /* 1rem = 1% of the width (or 1.78% of the height on a squarer screen).
+     More than 20 teams rotate through pages of 20 so type stays readable from
+     the back of the room, instead of shrinking 100 rows onto one screen. */
+  html { font-size: min(1vw, 1.7778vh); }
+  html, body { height: 100%; }
+  body { overflow: hidden; display: flex; flex-direction: column; }
+  header { padding: 2vh 4rem 1vh; display: flex; align-items: center; gap: 2rem; }
+  header h1 { font-size: 3.2rem; letter-spacing: -0.02em; }
+  header .sub { font-size: 1.4rem; color: var(--dim); font-weight: 700; letter-spacing: .14em;
+    text-transform: uppercase; }
+
+  .cols { --rowh: min(9vh, calc(78vh / var(--rows, 10)));
+    flex: 1 1 auto; min-height: 0; display: grid; align-content: start; grid-auto-flow: column;
+    gap: 0 4rem; padding: 1vh 4rem 3vh;
+    grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr));
+    grid-template-rows: repeat(var(--rows, 10), var(--rowh)); }
+  .r { display: flex; align-items: center; gap: 1.4rem; padding: 0 1rem;
+    border-bottom: 1px solid #1c232c; min-width: 0; }
+  .rk { font-family: var(--mono); font-size: calc(var(--rowh) * 0.45); color: var(--dim);
+    width: 3.6rem; text-align: right; font-weight: 700; }
+  .nm { flex: 1; min-width: 0; font-size: calc(var(--rowh) * 0.5); font-weight: 700;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tn { font-family: var(--mono); font-size: max(1rem, calc(var(--rowh) * 0.28)); color: var(--dim); }
+  .sc { font-family: var(--mono); font-size: calc(var(--rowh) * 0.55); font-weight: 850;
+    font-variant-numeric: tabular-nums; }
+  .r.top1 { background: rgba(227,160,8,0.14); border-radius: 10px; }
+  .r.top1 .rk, .r.top1 .sc { color: var(--amber); }
+  .r.top2 { background: rgba(255,255,255,0.05); border-radius: 10px; }
+  .r.top3 { background: rgba(255,255,255,0.03); border-radius: 10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Scoreboard</h1>
+  <div class="spacer"></div>
+  <div class="sub" id="sub"></div>
+</header>
+<div class="cols" id="cols"></div>
+
+<script src="/live.js"></script>
+<script>
+(function () {
+  'use strict';
+  var P = window.WIZ;
+  var PER_PAGE = 20, ROTATE_MS = 8000;
+  var rows = [], page = 0, title = '';
+
+  function paint() {
+    var pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
+    if (page >= pages) page = 0;
+    var slice = rows.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
+    P.el('title').textContent = title || 'Scoreboard';
+    P.el('sub').textContent = rows.length + ' teams' + (pages > 1 ? '  ·  page ' + (page + 1) + ' of ' + pages : '');
+    var cols = slice.length <= 10 ? 1 : 2;
+    var cs = P.el('cols');
+    cs.style.setProperty('--cols', cols);
+    cs.style.setProperty('--rows', Math.max(1, Math.ceil(slice.length / cols)));
+    cs.innerHTML = slice.map(function (r) {
+      var cls = r.score <= 0 ? '' : r.rank === 1 ? 'top1' : r.rank === 2 ? 'top2' : r.rank === 3 ? 'top3' : '';
+      return '<div class="r ' + cls + '"><div class="rk">' + r.rank + '</div>' +
+        '<div class="nm">' + P.esc(r.name) + ' <span class="tn">T' + r.number + '</span></div>' +
+        '<div class="sc ' + (r.score > 0 ? 'pos' : r.score < 0 ? 'neg' : 'muted') + '">' +
+        r.score + '</div></div>';
+    }).join('');
+  }
+
+  setInterval(function () {
+    if (rows.length > PER_PAGE) { page = (page + 1) % Math.ceil(rows.length / PER_PAGE); paint(); }
+  }, ROTATE_MS);
+
+  new P.Connection({
+    role: 'board',
+    onState: function (s) {
+      if (s.type === 'ping') return;
+      rows = s.scoreboard || []; title = s.quiz_name; paint();
+    }
+  }).start();
+})();
+</script>
+</body>
+</html>

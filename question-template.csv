@@ -1,0 +1,18 @@
+# One row per question. Lines starting with # are ignored.
+# Answer       : the official answer. Matching ignores case, spaces, punctuation, accents and a leading The/A/An, so 'The Ganges' and 'ganges' are the same.
+# Also Accepted: other wordings you would accept, separated by |  e.g.  Ganga|River Ganga
+# Points       : worth of this question. Blank = the quiz default.
+# Image URL    : optional; pictures named 5.jpg or 5_1.jpg in media/ are found automatically.
+Question Number,Question,Answer,Also Accepted,Points,Image URL,Notes
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
